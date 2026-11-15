@@ -268,7 +268,7 @@ class GameAdapter(private val activity: AppCompatActivity) :
                 }
                 if (!GameEngine.usesNative(activity, game)) {
                     emulate()
-                } else if (!GameEngine.launchNative(activity, game)) {
+                } else if (!GameEngine.launchNative(activity, game, emulate)) {
                     MaterialAlertDialogBuilder(activity)
                         .setTitle(R.string.game_engine_banana_missing)
                         .setMessage(R.string.game_engine_banana_missing_description)
