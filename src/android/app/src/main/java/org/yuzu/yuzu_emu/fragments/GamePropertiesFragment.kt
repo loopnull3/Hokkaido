@@ -47,6 +47,7 @@ import org.yuzu.yuzu_emu.model.SubmenuProperty
 import org.yuzu.yuzu_emu.model.TaskState
 import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import org.yuzu.yuzu_emu.utils.FileUtil
+import org.yuzu.yuzu_emu.utils.GameEngine
 import org.yuzu.yuzu_emu.utils.GameHelper
 import org.yuzu.yuzu_emu.utils.GameIconUtils
 import org.yuzu.yuzu_emu.utils.GpuDriverHelper
@@ -332,6 +333,18 @@ class GamePropertiesFragment : Fragment() {
                     }
                 )
             )
+
+            if (GameEngine.isBananaAvailable && !args.game.isHomebrew) {
+                add(
+                    SubmenuProperty(
+                        R.string.game_engine,
+                        R.string.game_engine_description,
+                        R.drawable.ic_graphics,
+                        details = { GameEngine.describe(requireContext(), args.game) },
+                        action = { showEngineDialog() }
+                    )
+                )
+            }
 
             if (!args.game.isHomebrew) {
                 add(
@@ -771,5 +784,34 @@ class GamePropertiesFragment : Fragment() {
                 Toast.LENGTH_SHORT
             ).show()
         }
+    }
+
+    private fun showEngineDialog() {
+        val choices = GameEngine.Choice.entries
+        val names = choices.map {
+            when (it) {
+                GameEngine.Choice.AUTO -> GameEngine.run {
+                    getString(
+                        R.string.game_engine_auto_now,
+                        getString(
+                            if (autoIsNative(args.game)) R.string.game_engine_native
+                            else R.string.game_engine_emulate
+                        )
+                    )
+                }
+                GameEngine.Choice.EMULATE -> getString(R.string.game_engine_emulate)
+                GameEngine.Choice.NATIVE -> getString(R.string.game_engine_native)
+            }
+        }.toTypedArray()
+        val current = choices.indexOf(GameEngine.choice(requireContext(), args.game))
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.game_engine)
+            .setSingleChoiceItems(names, current) { dialog, which ->
+                GameEngine.setChoice(requireContext(), args.game, choices[which])
+                dialog.dismiss()
+                reloadList()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }

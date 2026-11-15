@@ -28,6 +28,7 @@ import org.yuzu.yuzu_emu.databinding.CardGameGridBinding
 import org.yuzu.yuzu_emu.databinding.CardGameCarouselBinding
 import org.yuzu.yuzu_emu.model.Game
 import org.yuzu.yuzu_emu.model.GamesViewModel
+import org.yuzu.yuzu_emu.utils.GameEngine
 import org.yuzu.yuzu_emu.utils.GameIconUtils
 import org.yuzu.yuzu_emu.utils.ViewUtils.marquee
 import org.yuzu.yuzu_emu.viewholder.AbstractViewHolder
@@ -261,8 +262,20 @@ class GameAdapter(private val activity: AppCompatActivity) :
                     }
                 }
 
-                val action = HomeNavigationDirections.actionGlobalEmulationActivity(game, true)
-                binding.root.findNavController().navigate(action)
+                val emulate = {
+                    val action = HomeNavigationDirections.actionGlobalEmulationActivity(game, true)
+                    binding.root.findNavController().navigate(action)
+                }
+                if (!GameEngine.usesNative(activity, game)) {
+                    emulate()
+                } else if (!GameEngine.launchNative(activity, game)) {
+                    MaterialAlertDialogBuilder(activity)
+                        .setTitle(R.string.game_engine_banana_missing)
+                        .setMessage(R.string.game_engine_banana_missing_description)
+                        .setPositiveButton(R.string.game_engine_play_here) { _, _ -> emulate() }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
             }
 
             if (NativeLibrary.gameRequiresFirmware(game.programId) && !NativeLibrary.isFirmwareAvailable()) {
