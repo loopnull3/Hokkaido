@@ -1159,9 +1159,6 @@
     <string name="game_engine_banana_missing">Banana Native could not start</string>
     <string name="game_engine_banana_missing_description">This game is set to run in Banana Native, but this build has no Banana Native or it could not start. Play it with Hokkaido instead?</string>
     <string name="game_engine_play_here">Play with Hokkaido</string>
-    <string name="precache_shaders">Prebake shaders</string>
-    <string name="precache_shaders_description">Builds the game\'s shaders on the loading screen before it starts: the compute shaders in the game files and every pipeline cached in earlier sessions. Starting takes longer, but play stutters less and uses less memory early on.</string>
-    <string name="precache_shaders_always">Before playing</string>
     <string name="frames_ahead_auto">Auto</string>
     <string name="frames_ahead_off">Off</string>
     <string name="frames_ahead_on">On</string>
