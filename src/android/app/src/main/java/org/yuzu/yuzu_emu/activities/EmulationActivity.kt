@@ -56,6 +56,10 @@ import org.yuzu.yuzu_emu.features.settings.model.IntSetting
 import org.yuzu.yuzu_emu.features.settings.model.Settings
 import org.yuzu.yuzu_emu.model.EmulationViewModel
 import org.yuzu.yuzu_emu.model.Game
+import org.yuzu.yuzu_emu.ui.main.MainActivity
+import org.yuzu.yuzu_emu.utils.GameEngine
+import org.yuzu.yuzu_emu.utils.GameHelper
+import java.io.File
 import org.yuzu.yuzu_emu.network.NetPlayManager
 import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.utils.Log
@@ -124,6 +128,10 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
         ThemeHelper.setTheme(this)
 
         super.onCreate(savedInstanceState)
+
+        if (savedInstanceState == null && handOffToEngine()) {
+            return
+        }
 
         NativeConfig.reloadGlobalConfig()
 
@@ -259,7 +267,44 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
         super.onPause()
     }
 
+    /**
+     * A shortcut starts a game here with only its file (no game argument). A game whose engine is Banana
+     * Native goes to Hokkaido's home instead, which starts it through its engine (MainActivity).
+     */
+    private fun handOffToEngine(): Boolean {
+        if (!GameEngine.isBananaAvailable || intent.action != Intent.ACTION_VIEW ||
+            intent.extras?.containsKey("game") == true
+        ) {
+            return false
+        }
+        val game = runCatching {
+            val exefs = intent.getStringExtra(EmulationFragment.EXTRA_EXEFS_PATH)
+            when {
+                exefs != null -> GameHelper.getExeFSGame(File(exefs))
+                intent.data != null -> GameHelper.getGame(intent.data!!, false)
+                else -> null
+            }
+        }.getOrNull() ?: return false
+        if (!GameEngine.usesNative(this, game)) {
+            return false
+        }
+        handedOff = true
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_ENGINE_GAME, game)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        )
+        finish()
+        return true
+    }
+
+    private var handedOff = false
+
     override fun onDestroy() {
+        if (handedOff) {
+            super.onDestroy()
+            return
+        }
         mainHandler.removeCallbacks(romSwapStopTimeoutRunnable)
         super.onDestroy()
         inputManager.unregisterInputDeviceListener(this)

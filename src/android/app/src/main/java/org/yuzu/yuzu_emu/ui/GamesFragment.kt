@@ -46,6 +46,7 @@ import org.yuzu.yuzu_emu.model.Game
 import org.yuzu.yuzu_emu.model.GamesViewModel
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.ui.main.MainActivity
+import org.yuzu.yuzu_emu.utils.GameEngine
 import org.yuzu.yuzu_emu.utils.GameHelper
 import org.yuzu.yuzu_emu.utils.PathUtil
 import org.yuzu.yuzu_emu.utils.ViewUtils.setVisible
@@ -186,7 +187,10 @@ class GamesFragment : Fragment() {
     }
 
     private fun launchExeFSGame(game: Game) {
-        findNavController().navigate(HomeNavigationDirections.actionGlobalEmulationActivity(game))
+        val navController = findNavController()
+        GameEngine.start(requireActivity(), game) {
+            navController.navigate(HomeNavigationDirections.actionGlobalEmulationActivity(game))
+        }
     }
 
     private fun getCurrentViewType(): Int {

@@ -12,6 +12,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.yuzu.yuzu_emu.HomeNavigationDirections
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.model.Game
+import org.yuzu.yuzu_emu.utils.GameEngine
 import org.yuzu.yuzu_emu.utils.SerializableHelper.parcelable
 
 class LaunchGameDialogFragment : DialogFragment() {
@@ -28,9 +29,14 @@ class LaunchGameDialogFragment : DialogFragment() {
         return MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.launch_options)
             .setPositiveButton(android.R.string.ok) { _: DialogInterface, _: Int ->
-                val action = HomeNavigationDirections
-                    .actionGlobalEmulationActivity(game, selectedItem != 0)
-                requireParentFragment().findNavController().navigate(action)
+                val custom = selectedItem != 0
+                val navController = requireParentFragment().findNavController()
+                // The game's engine (Game properties › Engine), with the chosen settings.
+                GameEngine.start(requireActivity(), game!!, custom) {
+                    navController.navigate(
+                        HomeNavigationDirections.actionGlobalEmulationActivity(game, custom)
+                    )
+                }
             }
             .setSingleChoiceItems(launchOptions, 1) { _: DialogInterface, i: Int ->
                 selectedItem = i
