@@ -1108,6 +1108,11 @@ u64 GetCurrentProgramID();
 void SetCurrentProgramIsSwitch2(bool is_switch2);
 bool CurrentProgramIsSwitch2();
 
+// Value of a numeric EDEN_NX2_* environment switch for the running program. The variable holds a
+// plain number for every game, or a comma separated list of <title id>:<number> entries, where a
+// plain number in the list applies to the titles not named. 0 when unset or not matched.
+u32 PerTitleEnv(const char* name);
+
 // Reactive flushing in effect for the running program: the setting, or always for Pokemon
 // Pokopia under NCE, whose sky is drawn from GPU results the CPU reads back (black without it).
 bool ReactiveFlushingEnabled();
