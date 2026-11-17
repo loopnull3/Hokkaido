@@ -191,7 +191,8 @@ struct System::Impl {
 
     u64 program_id;
 
-    bool Initialize(System& system) {
+    // Leaves device_memory empty when the host can't back the guest RAM.
+    void CreateDeviceMemory() {
         try {
             device_memory.emplace();
         } catch (const std::bad_alloc&) {
@@ -200,6 +201,10 @@ struct System::Impl {
         if (device_memory && !device_memory->buffer.BackingBasePointer()) {
             device_memory.reset();
         }
+    }
+
+    bool Initialize(System& system) {
+        CreateDeviceMemory();
 
         is_multicore = Settings::values.use_multi_core.GetValue();
         memory_layout = Settings::values.memory_layout_mode.GetValue();
@@ -345,6 +350,12 @@ struct System::Impl {
 
     SystemResultStatus InitializeKernel(System& system) {
         LOG_DEBUG(Core, "initialized OK");
+
+        // ShutdownMainProcess releases it after a Switch 2 game; create it before the check below
+        // so an empty slot alone does not rerun the full Initialize.
+        if (!device_memory.has_value()) {
+            CreateDeviceMemory();
+        }
 
         // Setting changes may require a full system reinitialization (e.g., disabling multicore).
         ReinitializeIfNecessary(system);
@@ -572,6 +583,13 @@ struct System::Impl {
 
         // Reset all glue registrations
         arp_manager.ResetAll();
+
+        // The guest RAM section keeps every page the game touched until it is destroyed (up to
+        // 12 GiB), and the next Load reuses it. Switch 2 only: Switch 1 keeps its behaviour.
+        // InitializeKernel creates it again, sized for the next game.
+        if (Settings::CurrentProgramIsSwitch2()) {
+            device_memory.reset();
+        }
 
         LOG_DEBUG(Core, "Shutdown OK");
     }
