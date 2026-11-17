@@ -67,7 +67,7 @@ Other phones may work, but these are the only devices Hokkaido is tested on so f
 | The Legend of Zelda: Ocarina of Time (Switch 2) | Banana Native (experimental) | Playable on the S26 with the custom RADV driver. Hokkaido sets it up for that phone: mesh draws through compute, Hold 60 fps, and lighter textures and memory pools on 12 GB phones. Some distant textures can show pink. |
 | The Legend of Zelda: Ocarina of Time (Switch 2) | Hokkaido | Playable. Use 0.5x resolution; 16 GB of RAM recommended. It is no longer optimized for 12 GB phones, where it can run out of memory. |
 | Pokémon Pokopia | Banana Native | Playable at 1x resolution, with the save shared with the Hokkaido engine. |
-| Pokémon Pokopia | Hokkaido | Playable, also on 8 GB phones, with its sky (since 0.6.6). |
+| Pokémon Pokopia | Hokkaido | Playable, also on 8 GB phones, with its sky (since 0.6.6). On the S26 its frames come out unevenly (jittery camera); it runs better on the S24. |
 | Donkey Kong Bananza | Banana Native | Prepares and starts. |
 | Fire Emblem: Fortune's Weave | Hokkaido | Playable. Use 0.5x resolution and leave "Present a frame ahead" on Auto. |
 | Orbitals (Global Friends Pass) | Hokkaido | Boots into gameplay. |

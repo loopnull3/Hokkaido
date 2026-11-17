@@ -2,7 +2,7 @@
 
 The biggest Hokkaido release so far: a second engine. Next to Hokkaido's emulator, the APK now carries [Banana Native](https://git.eden-emu.dev/moceure/BananaNative), which runs a Switch 2 game's code natively on the phone and draws its graphics through Vulkan. You choose the engine per game, and Banana Native runs behind Hokkaido's own screens, with Hokkaido's GPU driver, saves and settings.
 
-Tested on a Samsung Galaxy S26 (Exynos 2600, Xclipse 960, 12 GB) and a Galaxy S25 (Snapdragon 8 Elite, Adreno 830, 12 GB), both on Android 17.
+Tested on a Samsung Galaxy S26 (Exynos 2600, Xclipse 960, 12 GB), a Galaxy S24 (Exynos 2400, Xclipse 940, 8 GB) and a Galaxy S25 (Snapdragon 8 Elite, Adreno 830, 12 GB), all on Android 17.
 
 ## New: the Banana Native engine
 
@@ -35,6 +35,8 @@ Ocarina of Time is playable through Banana Native on the Galaxy S26 with a custo
 - **Lower vegetation detail** by default, as Banana Native recommends. Full vegetation is a choice in Quick settings.
 
 ## Hokkaido engine
+
+The fixes marked as from upstream are ported from [Eglantine](https://github.com/Djihads80/Eglantine) and were tested there; on our phones they were checked for regressions in the games we have.
 
 - **New: Frame skip,** under Settings › Graphics and in the in-game Quick settings, for every game or per game. From 0 to 3 frames left undrawn after each drawn one: a game that slows down when the phone can't keep up runs at its own speed again, but shows fewer frames. 0, the default, draws every frame. Thanks to Diriande (#19).
 - **Stopping a game frees its memory.** A Switch 2 game's RAM used to stay held until Hokkaido was closed; now it is released when the game stops, so the next game, or a Banana Native game, has it back (upstream #634).
@@ -71,7 +73,7 @@ Ocarina of Time is playable through Banana Native on the Galaxy S26 with a custo
 - **On the Hokkaido engine:**
   - Fast Fusion runs at low frame rates, loads slowly and its image shimmers.
   - Ocarina of Time can stay on a black screen after its intro movie on some Snapdragon phones (issue #12).
-  - Pokopia runs slower than in earlier versions; Banana Native is the faster engine for it.
+  - Pokopia runs slower than in earlier versions on the Galaxy S26, and its frames come out unevenly, so walking and turning the camera look jittery. It runs better on the Galaxy S24. Banana Native is the faster engine for it.
 - **The APK is larger,** about 100 MB, since it carries Banana Native.
 - Microphone input is not supported on Android.
 - The phone heats up during long sessions and slows down until it cools.
@@ -85,5 +87,7 @@ Ocarina of Time is playable through Banana Native on the Galaxy S26 with a custo
 - Report problems at https://github.com/pavelgajdo/Hokkaido/issues with your phone, driver, the engine and the log: `eden_log.txt` for Hokkaido, or the game's log from `Android/data/dev.lichii.android/files/logs/` for Banana Native.
 
 ## Thanks
+
+Diriande for the frame skip (#19). The Eglantine and Lichii contributors whose fixes are ported here: linyesh, SmileyTatsu, rdenno, Rhys Denno, MythosOfs, kraibse, Duck912, Dominic and Zortos.
 
 Banana Native is by moceure and its contributors (MIT licence), based on [nxnative](https://github.com/seedds/nxnative) by seedds. Its frame generation uses Lossless Scaling's LSFG through Eden's port (GPL-3.0).
