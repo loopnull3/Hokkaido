@@ -40,6 +40,7 @@ Requirements: an arm64 phone with Android 13 or newer and Vulkan 1.3. Games, key
 - **Shared:** the GPU driver (the game's own, else the global one), the save folder, and the resolution scale (1x is 1920x1080).
 - **In game:** Back or the controller's menu button opens Hokkaido's menu on both engines. On Banana Native, Quick settings shows all of its in-game settings, live.
 - **One APK:** Banana Native is built in. Its own launcher never shows, and nothing else needs installing.
+- **Coming from the Banana Native app:** export the game's pack there (Manage › Export pack…), then in Hokkaido use Game properties › **Import Banana Native pack**, so the game doesn't need preparing again.
 
 ## Tested on
 

@@ -4,6 +4,32 @@ The biggest Hokkaido release so far: a second engine. Next to Hokkaido's emulato
 
 Tested on a Samsung Galaxy S26 (Exynos 2600, Xclipse 960, 12 GB), a Galaxy S24 (Exynos 2400, Xclipse 940, 8 GB) and a Galaxy S25 (Snapdragon 8 Elite, Adreno 830, 12 GB), all on Android 17.
 
+**Updating:** install the APK over 0.6.x. Your games, saves and settings stay. Every game keeps running on the Hokkaido engine unless Banana Native has a playable profile for it (see Auto below), and you can switch any game back in Game properties.
+
+## Getting started with Banana Native
+
+1. **GPU driver.** On an Xclipse GPU (Exynos), install a custom RADV driver in Hokkaido's GPU driver manager, globally or for the game. Banana Native uses the same driver as Hokkaido.
+2. **Engine.** Open the game's Game properties › **Engine**. Auto already picks Banana Native for its playable games; for the others choose **Banana Native (experimental)**.
+3. **First start: Prepare.** Banana Native rewrites the game's code from your dump once. It takes a few minutes, uses the CPU hard and warms the phone, so do it on the charger. You can hide it, pause it, or close Hokkaido; it continues where it stopped.
+4. **Play.** Shaders are built while you play and kept, so the first sessions show missing objects and pop-in that go away.
+5. **In game,** Back or the controller's menu button opens Hokkaido's menu: pause, controller, Quick settings with all of Banana Native's settings, overlay, exit.
+
+Games added as loose dumps work when Hokkaido has All files access; Banana Native reads the dump folder (the one holding `base/` and `updates/`).
+
+## Moving from the Banana Native app
+
+If you already prepared a game in Banana Native's own app, you don't need to prepare it again:
+
+1. In the Banana Native app, open the game's **Manage** sheet and choose **Export pack…**. It writes `banana-pack-<title ID>-<version>.zip` to a folder you pick.
+2. In Hokkaido, open the same game's **Game properties › Import Banana Native pack** and pick that zip.
+3. Hokkaido copies the pack and checks it with Banana Native's own checks: it must be this game's, and its code must fit your dump (the same game version). If it doesn't fit, nothing changes and the reason is shown.
+
+Good to know:
+
+- An exported pack has no shaders built while you played (Banana Native leaves them out of exports); the game builds them again while you play.
+- Without the import, Hokkaido also finds a pack you unzip yourself into a folder named `<title ID>-work/<any name>/` next to your game, or up to three folders above it.
+- Saves don't move automatically yet. Banana Native's save backups and Hokkaido's save import use different zip layouts.
+
 ## New: the Banana Native engine
 
 - **One APK, two engines.** Banana Native v0.3.41 is built into Hokkaido. Nothing else to install, and its own launcher never shows.
@@ -22,7 +48,7 @@ Tested on a Samsung Galaxy S26 (Exynos 2600, Xclipse 960, 12 GB), a Galaxy S24 (
   - A controller moves through the menu: the D-pad or left stick, A and B, and L / R to switch tabs.
   - **Exit** ends the game and returns to Hokkaido's game list.
 - **One game at a time.** Banana Native holds one game. Starting another asks you to close the one still running first.
-
+- **New in Banana Native v0.3.41:** Prepare no longer fails with a missing `pack_dump` module, and button icons in game text (the controller glyphs in prompts) draw with their own font instead of `?`.
 ## Ocarina of Time on Banana Native
 
 Ocarina of Time is playable through Banana Native on the Galaxy S26 with a custom RADV driver. Hokkaido sets it up for that phone:
