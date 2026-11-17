@@ -20,6 +20,16 @@ namespace Tegra {
     }
 }
 
+/// Switch 2 titles that keep the pre-nanosecond timestamps (GPU ticks divided by the clock setting,
+/// the non-ampere path below). Mario Kart World sizes its dynamic resolution from GPU timestamps:
+/// with nanoseconds the emulator's GPU latency reads as a nearly full frame budget, the resolution
+/// changes every few frames, and each change recreates and re-uploads its render targets (~20 fps
+/// instead of ~28-30 on an RX 6700S, 16x the texture cache image creations).
+[[nodiscard]] constexpr bool UsesLegacyAmpereTimestamps(u64 program_id) {
+    constexpr u64 MarioKartWorldProgramId = 0x0400C3F00006E000ULL;
+    return program_id == MarioKartWorldProgramId;
+}
+
 /// The last present's CoreTiming time and the GPU clock latched with it, packed into one word so
 /// both change together: a GPU Clocks change takes effect at the next present, never mid-frame.
 struct AmpereAnchor {
