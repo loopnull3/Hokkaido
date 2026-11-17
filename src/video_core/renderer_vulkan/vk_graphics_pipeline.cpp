@@ -608,6 +608,7 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
 
     const bool use_memo{texture_memo_eligible && !RecordingSampledTextures()};
     const bool verify_memo{use_memo && TextureMemoVerify()};
+    const u64 feedback_copies{texture_cache.FeedbackCopies()};
     boost::container::small_vector<GPUVAddr, 32> handle_addresses;
     boost::container::small_vector<VideoCommon::TextureHandleRead, 32> handle_reads;
     boost::container::small_vector<VideoCommon::ImageViewInOut, 32> memo_views;
@@ -773,11 +774,14 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
         texture_cache.FillImageViews(std::span(views.data(), views.size()), false,
                                      Spec::has_images);
     }
+    // Views of copies taken for this draw alone (it samples its own colour target).
+    const bool feedback_copied{texture_cache.FeedbackCopies() != feedback_copies};
     if (use_memo) {
         if (!memo_hit) {
             Count(g_memo_misses);
             // A pipeline whose draws keep changing textures stops paying for a memo nobody uses.
-            if (++texture_memo.misses <= 8 || (texture_memo.misses & 15) == 0) {
+            if (!feedback_copied &&
+                (++texture_memo.misses <= 8 || (texture_memo.misses & 15) == 0)) {
                 texture_cache.MemoizeTextures(texture_memo,
                                               std::span(handle_reads.data(), handle_reads.size()),
                                               std::span(views.data(), views.size()),
@@ -829,7 +833,11 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
             }
         }
     }
-    if (std::exchange(capture_delta, false) && delta_blocker == DeltaBlocker::None) {
+    if (feedback_copied) {
+        // Delta draws would sample the copy without taking a new one.
+        capture_delta = false;
+        delta_views_valid = false;
+    } else if (std::exchange(capture_delta, false) && delta_blocker == DeltaBlocker::None) {
         const auto same_view = [](const VideoCommon::ImageViewInOut& lhs,
                                   const VideoCommon::ImageViewInOut& rhs) {
             return lhs.index == rhs.index && lhs.id == rhs.id;
