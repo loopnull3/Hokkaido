@@ -204,7 +204,8 @@ struct GPU::Impl {
     }
 
     /// Whether the running title keeps GPU tick timestamps (UsesLegacyAmpereTimestamps). Known
-    /// once the application process exists; until then (program id 0) nanoseconds are used.
+    /// once the application process exists; until then (program id 0) nanoseconds are used. An
+    /// application change (NotifyApplicationChanged) replaces the cached answer.
     [[nodiscard]] bool LegacyTimestamps() const {
         s8 known = legacy_timestamps.load(std::memory_order_relaxed);
         if (known < 0) {
@@ -212,10 +213,18 @@ struct GPU::Impl {
             if (program_id == 0) {
                 return false;
             }
-            known = UsesLegacyAmpereTimestamps(program_id) ? 1 : 0;
-            legacy_timestamps.store(known, std::memory_order_relaxed);
+            const s8 found = UsesLegacyAmpereTimestamps(program_id) ? 1 : 0;
+            if (legacy_timestamps.compare_exchange_strong(known, found,
+                                                          std::memory_order_relaxed)) {
+                known = found;
+            }
         }
         return known != 0;
+    }
+
+    void NotifyApplicationChanged(u64 program_id) {
+        legacy_timestamps.store(UsesLegacyAmpereTimestamps(program_id) ? 1 : 0,
+                                std::memory_order_relaxed);
     }
 
     void RendererFrameEndNotify() {
@@ -606,6 +615,10 @@ std::vector<u8> GPU::GetAppletCaptureBuffer() {
 
 u64 GPU::GetTicks() const {
     return impl->GetTicks();
+}
+
+void GPU::NotifyApplicationChanged(u64 program_id) {
+    impl->NotifyApplicationChanged(program_id);
 }
 
 bool GPU::IsAsync() const {
