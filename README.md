@@ -39,6 +39,7 @@ Requirements: an arm64 phone with Android 13 or newer and Vulkan 1.3. Games, key
 - **Choosing:** Game properties › **Engine**: Auto, Hokkaido or Banana Native. Auto picks Banana Native for the games its profiles call playable (Donkey Kong Bananza, Pokémon Pokopia, Mario Kart World, Fire Emblem: Fortune's Weave, Star Fox) and Hokkaido for the rest. The games Banana Native is still bringing up are offered as **Banana Native (experimental)**.
 - **Shared:** the GPU driver (the game's own, else the global one), the save folder, and the resolution scale (1x is 1920x1080).
 - **In game:** Back or the controller's menu button opens Hokkaido's menu on both engines. On Banana Native, Quick settings shows all of its in-game settings, live.
+- **Game options:** Game properties › **Banana Native options** has full vegetation, the RAM saver (and its Strong level) and soft textures; **Build all shaders now** translates a game's whole shader set at once.
 - **One APK:** Banana Native is built in. Its own launcher never shows, and nothing else needs installing.
 - **Coming from the Banana Native app:** export the game's pack there (Manage › Export pack…), then in Hokkaido use Game properties › **Import Banana Native pack**, so the game doesn't need preparing again.
 
@@ -71,7 +72,7 @@ Other phones may work, but these are the only devices Hokkaido is tested on so f
 | The Legend of Zelda: Ocarina of Time (Switch 2) | Banana Native (experimental) | Playable on the S26 with the custom RADV driver. Hokkaido sets it up for that phone: mesh draws through compute, Hold 60 fps, and lighter textures and memory pools on 12 GB phones. Some distant textures can show pink. |
 | The Legend of Zelda: Ocarina of Time (Switch 2) | Hokkaido | Playable. Use 0.5x resolution; 16 GB of RAM recommended. It is no longer optimized for 12 GB phones, where it can run out of memory. |
 | Pokémon Pokopia | Banana Native | Playable at 1x resolution, with the save shared with the Hokkaido engine. |
-| Pokémon Pokopia | Hokkaido | Playable, also on 8 GB phones, with its sky (since 0.6.6). On the S26 its frames come out unevenly (jittery camera); it runs better on the S24. |
+| Pokémon Pokopia | Hokkaido | Playable, also on 8 GB phones, with its sky (since 0.6.6), and with even frames since 0.7.1. It runs slower on the S26 than on the S24. |
 | Donkey Kong Bananza | Banana Native | Prepares and starts. |
 | Fire Emblem: Fortune's Weave | Hokkaido | Playable. Use 0.5x resolution and leave "Present a frame ahead" on Auto. |
 | Orbitals (Global Friends Pass) | Hokkaido | Boots into gameplay. |
