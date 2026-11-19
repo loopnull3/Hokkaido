@@ -3,38 +3,22 @@
 
 package org.yuzu.yuzu_emu.adapters
 
-import android.content.DialogInterface
-import android.text.Html
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.pm.ShortcutInfoCompat
-import androidx.core.content.pm.ShortcutManagerCompat
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
-import androidx.preference.PreferenceManager
 import androidx.viewbinding.ViewBinding
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.yuzu.yuzu_emu.HomeNavigationDirections
 import org.yuzu.yuzu_emu.R
-import org.yuzu.yuzu_emu.YuzuApplication
 import org.yuzu.yuzu_emu.databinding.CardGameListBinding
 import org.yuzu.yuzu_emu.databinding.CardGameGridBinding
 import org.yuzu.yuzu_emu.databinding.CardGameCarouselBinding
 import org.yuzu.yuzu_emu.model.Game
-import org.yuzu.yuzu_emu.model.GamesViewModel
-import org.yuzu.yuzu_emu.utils.GameEngine
 import org.yuzu.yuzu_emu.utils.GameIconUtils
+import org.yuzu.yuzu_emu.utils.GameLaunch
 import org.yuzu.yuzu_emu.utils.ViewUtils.marquee
 import org.yuzu.yuzu_emu.viewholder.AbstractViewHolder
-import androidx.core.content.edit
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.databinding.CardGameGridCompactBinding
 import org.yuzu.yuzu_emu.features.settings.model.BooleanSetting
 import org.yuzu.yuzu_emu.features.settings.model.Settings
@@ -226,65 +210,7 @@ class GameAdapter(private val activity: AppCompatActivity) :
         }
 
         fun onClick(game: Game) {
-            if (!game.fileExists) {
-                Toast.makeText(
-                    YuzuApplication.appContext,
-                    R.string.loader_error_file_not_found,
-                    Toast.LENGTH_LONG
-                ).show()
-
-                ViewModelProvider(activity)[GamesViewModel::class.java].reloadGames(true)
-                return
-            }
-
-            val launch: () -> Unit = {
-                val preferences =
-                    PreferenceManager.getDefaultSharedPreferences(YuzuApplication.appContext)
-                preferences.edit {
-                    putLong(
-                        game.keyLastPlayedTime,
-                        System.currentTimeMillis()
-                    )
-                }
-
-                activity.lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        val shortcut =
-                            ShortcutInfoCompat.Builder(YuzuApplication.appContext, game.path)
-                                .setShortLabel(game.title)
-                                .setIcon(GameIconUtils.getShortcutIcon(activity, game))
-                                .setIntent(game.launchIntent)
-                                .build()
-                        ShortcutManagerCompat.pushDynamicShortcut(
-                            YuzuApplication.appContext,
-                            shortcut
-                        )
-                    }
-                }
-
-                GameEngine.start(activity, game) {
-                    val action = HomeNavigationDirections.actionGlobalEmulationActivity(game, true)
-                    binding.root.findNavController().navigate(action)
-                }
-            }
-
-            if (NativeLibrary.gameRequiresFirmware(game.programId) && !NativeLibrary.isFirmwareAvailable()) {
-                MaterialAlertDialogBuilder(activity)
-                    .setTitle(R.string.loader_requires_firmware)
-                    .setMessage(
-                        Html.fromHtml(
-                            activity.getString(R.string.loader_requires_firmware_description),
-                            Html.FROM_HTML_MODE_LEGACY
-                        )
-                    )
-                    .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
-                        launch()
-                    }
-                    .setNegativeButton(android.R.string.cancel) { _, _ -> }
-                    .show()
-            } else {
-                launch()
-            }
+            GameLaunch.start(activity, binding.root.findNavController(), game)
         }
 
         fun onLongClick(game: Game): Boolean {

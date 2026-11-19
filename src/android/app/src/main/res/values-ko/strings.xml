@@ -740,4 +740,26 @@
     <!-- Licenses screen strings -->
     <string name="licenses">라이센스</string>
     <string name="license_fidelityfx_fsr_description">AMD 고품질 업스케일링</string>
-    </resources>
+
+    <!-- 콘솔 홈 (OrbitHomeFragment) -->
+    <string name="orbit_all_software">모든 소프트웨어</string>
+    <string name="orbit_no_games">아직 게임이 없어요. 스토어에서 게임이 있는 폴더를 추가하세요.</string>
+    <string name="orbit_open">열기</string>
+    <string name="orbit_turn_off">끄기</string>
+    <string name="orbit_news">소식</string>
+    <string name="orbit_news_description">Hokkaido 버전과 정보를 봅니다.</string>
+    <string name="orbit_store">스토어</string>
+    <string name="orbit_store_description">게임이 있는 폴더를 추가하거나 관리합니다.</string>
+    <string name="orbit_album">앨범</string>
+    <string name="orbit_album_description">스크린샷 등 Hokkaido 파일을 휴대폰 파일 앱에서 엽니다.</string>
+    <string name="orbit_album_unavailable">Hokkaido 파일을 열 수 있는 파일 앱이 없어요.</string>
+    <string name="orbit_controllers">컨트롤러</string>
+    <string name="orbit_controllers_description">컨트롤러와 버튼 배치를 설정합니다.</string>
+    <string name="orbit_settings">설정</string>
+    <string name="orbit_settings_description">Hokkaido 설정을 엽니다.</string>
+    <string name="orbit_sleep">절전</string>
+    <string name="orbit_sleep_description">화면을 끕니다. 화면을 누르거나 버튼을 누르면 다시 켜져요.</string>
+    <string name="orbit_view_home">콘솔 홈</string>
+    <string name="orbit_view_start">콘솔 홈으로 시작</string>
+
+</resources>

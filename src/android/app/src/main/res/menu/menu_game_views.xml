@@ -15,4 +15,11 @@
             android:id="@+id/view_carousel"
             android:title="@string/view_carousel" />
     </group>
+    <item
+        android:id="@+id/view_orbit_home"
+        android:title="@string/orbit_view_home" />
+    <item
+        android:id="@+id/view_orbit_start"
+        android:checkable="true"
+        android:title="@string/orbit_view_start" />
 </menu>

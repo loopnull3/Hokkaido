@@ -80,6 +80,7 @@ class GamesFragment : Fragment() {
 
     private val gamesViewModel: GamesViewModel by activityViewModels()
     private val homeViewModel: HomeViewModel by activityViewModels()
+    private val orbitState: OrbitHomeState by activityViewModels()
     private lateinit var gameAdapter: GameAdapter
 
     private val preferences =
@@ -304,6 +305,17 @@ class GamesFragment : Fragment() {
         }
 
         setInsets()
+
+        // The app opens on the console home, once (after the first-time setup when that shows): All software comes back to this list
+        view.post {
+            if (_binding == null || orbitState.opened || !OrbitHomeFragment.opensAtStart(requireContext())) {
+                return@post
+            }
+            val nav = findNavController()
+            if (nav.currentDestination?.id != R.id.gamesFragment) return@post
+            orbitState.opened = true
+            nav.navigate(R.id.orbitHomeFragment)
+        }
     }
 
     val applyGridGamesBinding = {
@@ -468,9 +480,22 @@ class GamesFragment : Fragment() {
             GameAdapter.VIEW_TYPE_GRID -> popup.menu.findItem(R.id.view_grid).isChecked = true
             GameAdapter.VIEW_TYPE_CAROUSEL -> popup.menu.findItem(R.id.view_carousel).isChecked = true
         }
+        popup.menu.findItem(R.id.view_orbit_start).isChecked = OrbitHomeFragment.opensAtStart(requireContext())
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.view_orbit_home -> {
+                    findNavController().navigate(R.id.orbitHomeFragment)
+                    true
+                }
+
+                R.id.view_orbit_start -> {
+                    val on = !item.isChecked
+                    preferences.edit().putBoolean(OrbitHomeFragment.START_KEY, on).apply()
+                    item.isChecked = on
+                    true
+                }
+
                 R.id.view_grid -> {
                     if (getCurrentViewType() == GameAdapter.VIEW_TYPE_CAROUSEL) onPause()
                     setCurrentViewType(GameAdapter.VIEW_TYPE_GRID)

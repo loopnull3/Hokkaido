@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbit</title>
+<!-- Hokkaido's console home (OrbitHomeFragment). The games, labels and actions come from the app (window.Hokkaido). -->
+<style>
+  :root{
+    --tile: clamp(124px, 19vw, 220px);
+    --gap: clamp(12px, 1.4vw, 18px);
+    --r: calc(var(--tile) * .14);
+    --label: #f5f5f7;
+    --secondary: #8e8e93;
+    --fill: #1c1c1e;
+    --fill-2: #2c2c2e;
+    --in-t: 0px; --in-r: 0px; --in-b: 0px; --in-l: 0px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#000;color:var(--label);
+    font-family:system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;user-select:none}
+  canvas{position:fixed;inset:0;width:100%;height:100%}
+  #stars{z-index:0} #planet{z-index:1}
+
+  .home{position:relative;z-index:2;height:100%;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);
+    padding:calc(var(--in-t) + 20px) calc(var(--in-r) + 5vw) calc(var(--in-b) + 18px) calc(var(--in-l) + 5vw);
+    transition:transform .55s cubic-bezier(.32,.72,0,1), opacity .4s}
+  .home.away{transform:scale(.94);opacity:0}
+
+  header{display:flex;align-items:center;justify-content:space-between}
+  .me{width:38px;height:38px;border-radius:50%;background:var(--fill-2);display:grid;place-items:center;
+    font-size:16px;font-weight:600;color:#d1d1d6;cursor:pointer}
+  .status{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
+
+  .games{align-self:center;transform:translateY(-6vh)}
+  .name{font-size:clamp(22px,2.6vw,30px);font-weight:600;letter-spacing:-.015em;height:1.3em;margin:0 0 14px 2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .15s}
+  .row{display:flex;gap:var(--gap);overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding:0 8px;
+    padding:8px;margin:-8px}
+  .row::-webkit-scrollbar{display:none}
+  .tile{flex:0 0 var(--tile);aspect-ratio:1;border-radius:var(--r);cursor:pointer;position:relative;
+    scroll-snap-align:start;overflow:hidden;transition:box-shadow .18s;background:var(--fill)}
+  .tile svg,.tile img{display:block;width:100%;height:100%;object-fit:cover}
+  .tile::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09);pointer-events:none}
+  .tile.on{box-shadow:0 0 0 3px #000,0 0 0 6px #fff}
+  .empty{font-size:15px;color:var(--secondary);padding:8px 2px}
+
+  .dock{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .icons{display:flex;gap:clamp(12px,2vw,22px)}
+  .sys{width:clamp(46px,4.6vw,54px);aspect-ratio:1;border-radius:50%;background:var(--fill);
+    display:grid;place-items:center;cursor:pointer;position:relative;transition:box-shadow .18s}
+  .sys svg{width:44%;height:44%}
+  .sys.on{box-shadow:0 0 0 3px #000,0 0 0 6px #fff}
+  .caption{font-size:13px;color:var(--secondary);height:16px;transition:opacity .15s}
+
+  /* a game opening: its tile grows to the screen while the app starts it */
+  .open{position:fixed;z-index:5;overflow:hidden;display:none;
+    transition:all .55s cubic-bezier(.32,.72,0,1)}
+  .open svg,.open img{width:100%;height:100%;display:block;object-fit:contain}
+
+  /* sheet */
+  .sheet{position:fixed;inset:0;z-index:4;background:rgba(0,0,0,.55);display:grid;place-items:end center;
+    padding:0 16px calc(var(--in-b) + 16px);opacity:0;pointer-events:none;transition:opacity .25s}
+  .sheet.on{opacity:1;pointer-events:auto}
+  .panel{width:min(400px,100%);background:var(--fill);border-radius:22px;padding:22px 20px 16px;
+    transform:translateY(30px);transition:transform .45s cubic-bezier(.32,.72,0,1)}
+  .sheet.on .panel{transform:none}
+  .panel h3{font-size:19px;font-weight:600}
+  .panel p{font-size:15px;color:var(--secondary);margin-top:6px;line-height:1.45}
+  .panel .btns{display:flex;gap:10px;margin-top:20px}
+  .panel button{flex:1;padding:13px;border:0;border-radius:13px;background:var(--fill-2);color:var(--label);
+    font:500 15px system-ui,sans-serif;cursor:pointer}
+  .panel button.primary{background:#fff;color:#000}
+  .panel button.on{box-shadow:0 0 0 2px var(--fill),0 0 0 4px #fff}
+  .sleep{position:fixed;inset:0;z-index:9;background:#000;opacity:0;pointer-events:none;transition:opacity .8s}
+  .sleep.on{opacity:1;pointer-events:auto}
+
+  :focus{outline:none}
+  @media (max-height:520px){ .games{transform:none} .name{margin-bottom:8px} :root{--tile:clamp(100px,30vh,170px)} }
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<canvas id="planet"></canvas>
+
+<div class="home" id="home">
+  <header>
+    <div class="me" id="me"></div>
+    <div class="status">
+      <span id="clock"></span>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".6" y=".6" width="21" height="10.8" rx="3" stroke="#8e8e93" stroke-width="1.2"/><rect id="lvl" x="2.4" y="2.4" width="17.4" height="7.2" rx="1.6" fill="#f5f5f7"/><path d="M23.3 4.2v3.6" stroke="#8e8e93" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </header>
+
+  <section class="games">
+    <h1 class="name" id="name"></h1>
+    <div class="row" id="row"></div>
+  </section>
+
+  <nav class="dock">
+    <div class="icons" id="icons"></div>
+    <div class="caption" id="caption"></div>
+  </nav>
+</div>
+
+<div class="open" id="open"></div>
+<div class="sheet" id="sheet"><div class="panel"><h3 id="sT"></h3><p id="sP"></p><div class="btns" id="sB"></div></div></div>
+<div class="sleep" id="sleep"></div>
+
+<script>
+/* ---------------- the app ---------------- */
+const app = window.Hokkaido || {
+  games:()=>'[]', labels:()=>'{}', user:()=>'', battery:()=>-1, launch:()=>{}, action:()=>{}
+};
+const L = Object.assign({
+  all:'All software', empty:'No games yet. Add a games folder under Store.', close:'Close', cancel:'Cancel', off:'Turn off',
+  news:'News', newsBody:'', store:'Store', storeBody:'', album:'Album', albumBody:'', controller:'Controllers', controllerBody:'',
+  settings:'Settings', settingsBody:'', sleep:'Sleep', sleepBody:'', open:'Open'
+}, JSON.parse(app.labels() || '{}'));
+
+/* ---------------- covers: the game's icon, else one drawn from its title ---------------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const COVERS = [['#0b1a3a','#1f4fc4','#fff'],['#f3c3a0','#d9643c','#5a1a0c'],['#0f3d45','#5fb0ad','#f1ecdd'],['#000','#9b9b9b','#fff'],
+  ['#f2e2b6','#d39a3a','#6e4310'],['#030308','#2d6fe0','#fff'],['#1d2550','#e48a69','#e9e3f5']];
+function hash(s){let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0}
+function lines(t){
+  const words=t.split(/\s+/).filter(Boolean), out=[]; let cur='';
+  for(const w of words){ if(cur && (cur+' '+w).length>12){ out.push(cur); cur=w } else cur=cur?cur+' '+w:w }
+  if(cur) out.push(cur);
+  return out.slice(0,4);
+}
+function drawn(g){
+  const [bg,ac,fg]=COVERS[hash(g.t)%COVERS.length], ls=lines(g.t), size=ls.length>2?10:13;
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="${bg}"/>
+    <circle cx="50" cy="152" r="80" fill="${ac}"/><circle cx="50" cy="152" r="80" fill="none" stroke="${fg}" stroke-opacity=".35" stroke-width="1.3"/>
+    ${ls.map((l,i)=>`<text x="10" y="${22+i*(size+3)}" font-family="system-ui,sans-serif" font-size="${size}" font-weight="700" fill="${fg}" letter-spacing="-.3">${esc(l)}</text>`).join('')}</svg>`;
+}
+const cover = g => g.all
+  ? `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#1c1c1e"/>${[0,1,2].flatMap(r=>[0,1,2].map(c=>`<rect x="${31+c*14}" y="${31+r*14}" width="10" height="10" rx="2.6" fill="#48484a"/>`)).join('')}</svg>`
+  : g.i ? `<img src="${esc(g.i)}" alt="" onerror="this.outerHTML=drawn(tiles[${g.n}])">` : drawn(g);
+
+/* ---------------- dock ---------------- */
+const ic = p=>`<svg viewBox="0 0 24 24" fill="none" stroke="#f5f5f7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const sys = [
+  {id:'news', name:L.news, body:L.newsBody, icon:'<path d="M5 4.5h11a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2zM18 9.5h1.5V17a2 2 0 0 1-2 2M8.5 8.5h6M8.5 12h6M8.5 15.5h3.5"/>'},
+  {id:'store', name:L.store, body:L.storeBody, icon:'<path d="M5 8.5h14l-1.1 10.6a1.6 1.6 0 0 1-1.6 1.4H7.7a1.6 1.6 0 0 1-1.6-1.4zM9 8.5V7a3 3 0 0 1 6 0v1.5"/>'},
+  {id:'album', name:L.album, body:L.albumBody, icon:'<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><circle cx="9" cy="10.3" r="1.6"/><path d="m4 16.5 4.6-4 3.6 3.1 2.8-2.3 4.5 3.7"/>'},
+  {id:'controller', name:L.controller, body:L.controllerBody, icon:'<path d="M7.3 8.5h9.4a4 4 0 0 1 3.9 4.6l-.6 3.4a2.1 2.1 0 0 1-3.8.9L15 15.5H9l-1.2 1.9a2.1 2.1 0 0 1-3.8-.9l-.6-3.4a4 4 0 0 1 3.9-4.6zM8.3 11.3v3M6.8 12.8h3"/><circle cx="15.6" cy="12.2" r=".5" fill="#f5f5f7"/><circle cx="17.1" cy="13.6" r=".5" fill="#f5f5f7"/>'},
+  {id:'settings', name:L.settings, body:L.settingsBody, icon:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'},
+  {id:'sleep', name:L.sleep, body:L.sleepBody, icon:'<path d="M12 3.5v7.5M7.2 6.6a7.2 7.2 0 1 0 9.6 0"/>', sleep:true},
+];
+
+/* ---------------- build ---------------- */
+const $=id=>document.getElementById(id);
+const row=$('row'), icons=$('icons');
+let tiles=[];
+function build(){
+  const games=JSON.parse(app.games() || '[]');
+  tiles=games.map((g,n)=>Object.assign({n},g)).concat([{all:true, t:L.all}]);
+  row.innerHTML='';
+  tiles.forEach((g,i)=>{const t=document.createElement('div');t.className='tile';t.innerHTML=cover(g);
+    t.onclick=()=>sel.r===0&&sel.c===i?act():go(0,i);row.appendChild(t)});
+  if(!games.length){ const e=document.createElement('div'); e.className='empty'; e.textContent=L.empty; row.prepend(e) }
+  const u=app.user()||''; $('me').textContent=u?u.trim().charAt(0).toUpperCase():'';
+}
+sys.forEach((s,i)=>{const b=document.createElement('div');b.className='sys';b.innerHTML=ic(s.icon);
+  b.onclick=()=>sel.r===1&&sel.c===i?act():go(1,i);icons.appendChild(b)});
+$('me').onclick=()=>app.action('profiles');
+
+/* ---------------- focus ---------------- */
+const sel={r:0,c:0}, last=[0,0];
+let sunTarget=.3;
+const tileEls=()=>[...row.children].filter(e=>e.classList.contains('tile'));
+function go(r,c){
+  const list=r?[...icons.children]:tileEls(); if(!list.length) return; c=Math.max(0,Math.min(list.length-1,c));
+  sel.r=r; sel.c=c; last[r]=c;
+  tileEls().forEach((t,i)=>t.classList.toggle('on',!r&&i===c));
+  [...icons.children].forEach((t,i)=>t.classList.toggle('on',r&&i===c));
+  const nm=$('name'), cap=$('caption');
+  if(!r){
+    nm.textContent=tiles[c].t; cap.textContent='';
+    const t=list[c], Lx=t.offsetLeft-row.offsetLeft;
+    if(Lx-8<row.scrollLeft||Lx+t.offsetWidth+8>row.scrollLeft+row.clientWidth) row.scrollTo({left:Lx-8,behavior:'smooth'});
+    sunTarget=.18+.64*(c/Math.max(1,list.length-1));
+  } else { cap.textContent=sys[c].name; }
+}
+
+/* ---------------- actions ---------------- */
+let opened=false;
+function act(){
+  if(sheetOn()) return pressSheet();
+  if(sel.r===0) return tiles[sel.c].all ? app.action('all') : openGame(sel.c);
+  openSheet(sys[sel.c]);
+}
+function openGame(i){
+  if(opened) return; opened=true;
+  const g=tiles[i], t=tileEls()[i], b=t.getBoundingClientRect(), o=$('open');
+  o.innerHTML=cover(g);
+  Object.assign(o.style,{display:'block',transition:'none',left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px',
+    borderRadius:getComputedStyle(t).borderRadius,background:'#000'});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    o.style.transition=''; Object.assign(o.style,{left:0,top:0,width:'100vw',height:'100vh',borderRadius:0});
+    $('home').classList.add('away');
+  }));
+  setTimeout(()=>app.launch(g.n), 480);
+}
+function closeGame(){
+  if(!opened) return;
+  const o=$('open'), t=tileEls()[sel.c];
+  $('home').classList.remove('away');
+  if(t){ const b=t.getBoundingClientRect();
+    Object.assign(o.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px',borderRadius:getComputedStyle(t).borderRadius}); }
+  setTimeout(()=>{o.style.display='none';opened=false},560);
+}
+
+const sheetOn=()=>$('sheet').classList.contains('on');
+let sheetBtn=1, sheetFor=null;
+function openSheet(s){
+  sheetFor=s; $('sT').textContent=s.name; $('sP').textContent=s.body;
+  $('sB').innerHTML = `<button data-a="x">${esc(s.sleep?L.cancel:L.close)}</button><button class="primary" data-a="go">${esc(s.sleep?L.off:L.open)}</button>`;
+  sheetBtn=1; markSheet(); $('sheet').classList.add('on');
+}
+function markSheet(){ [...$('sB').children].forEach((b,i)=>b.classList.toggle('on',i===sheetBtn)) }
+function pressSheet(){ const a=$('sB').children[sheetBtn].dataset.a; sheetAct(a) }
+function sheetAct(a){
+  closeSheet();
+  if(a!=='go'||!sheetFor) return;
+  if(sheetFor.sleep) $('sleep').classList.add('on'); else app.action(sheetFor.id);
+}
+function closeSheet(){ $('sheet').classList.remove('on'); }
+$('sheet').onclick=e=>{
+  const a=e.target.dataset.a;
+  if(e.target.id==='sheet') closeSheet(); else if(a) sheetAct(a);
+};
+$('sleep').onclick=()=>$('sleep').classList.remove('on');
+
+function move(dx,dy){
+  if($('sleep').classList.contains('on')) return $('sleep').classList.remove('on');
+  if(opened) return;
+  if(sheetOn()){ if(dx){ sheetBtn=Math.max(0,Math.min(1,sheetBtn+dx)); markSheet() } return }
+  if(dy){ const r=Math.max(0,Math.min(1,sel.r+dy)); if(r!==sel.r) go(r,last[r]); }
+  else go(sel.r,sel.c+dx);
+}
+/** Back: true when the page took it (the sleep screen, a sheet); false leaves it to the app */
+function back(){
+  if($('sleep').classList.contains('on')){ $('sleep').classList.remove('on'); return true }
+  if(sheetOn()){ closeSheet(); return true }
+  return false;
+}
+
+/* ---------------- input: the app passes the controller's buttons and stick; the keyboard works as well ---------------- */
+const DIRS={R:[1,0],L:[-1,0],D:[0,1],U:[0,-1]};
+let stickDir='', stickNext=0;
+window.orbit = {
+  key(k){ if(DIRS[k]) move(...DIRS[k]); else if(k==='A'){ $('sleep').classList.contains('on')?back():act() } return true },
+  stick(d){ if(d!==stickDir){ stickDir=d; if(d){ move(...DIRS[d]); stickNext=performance.now()+380 } } },
+  back,
+  reset(){ closeSheet(); closeGame(); },
+  refresh(){ const was=sel.r===0?tiles[sel.c]:null; build(); go(sel.r, sel.r===0&&was&&!was.all?Math.min(sel.c,tiles.length-1):sel.c); },
+  insets(t,r,b,l){ const s=document.documentElement.style; s.setProperty('--in-t',t+'px'); s.setProperty('--in-r',r+'px'); s.setProperty('--in-b',b+'px'); s.setProperty('--in-l',l+'px'); },
+};
+addEventListener('keydown',e=>{
+  const m={ArrowRight:'R',ArrowLeft:'L',ArrowDown:'D',ArrowUp:'U'}[e.key];
+  if(m){orbit.key(m);e.preventDefault();return}
+  if(e.key==='Enter'||e.key===' '){ orbit.key('A'); e.preventDefault(); }
+});
+(function repeat(){
+  if(stickDir && performance.now()>stickNext){ move(...DIRS[stickDir]); stickNext=performance.now()+140 }
+  requestAnimationFrame(repeat);
+})();
+
+/* ---------------- clock / battery ---------------- */
+const tick=()=>{
+  $('clock').textContent=new Date().toLocaleTimeString(navigator.language,{hour:'numeric',minute:'2-digit'});
+  const b=app.battery(); if(b>=0){ $('lvl').setAttribute('width',(17.4*b).toFixed(1)); $('lvl').setAttribute('fill',b<=.2?'#ff453a':'#f5f5f7') }
+};
+tick(); setInterval(tick,10000);
+
+/* ---------------- sky: stars + planet limb with a moving sun ---------------- */
+function rng(seed){return()=>((seed=Math.imul(seed^seed>>>15,seed|1)+0x6d2b79f5|0)>>>0)/4294967296}
+const sc=$('stars').getContext('2d'), pc=$('planet').getContext('2d');
+let W,H,D,R,cx,cy, sun=.3;
+const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function size(){
+  D=Math.min(2,devicePixelRatio||1); W=innerWidth; H=innerHeight;
+  for(const c of [$('stars'),$('planet')]){c.width=W*D;c.height=H*D}
+  sc.setTransform(D,0,0,D,0,0); pc.setTransform(D,0,0,D,0,0);
+  R=Math.max(W,H)*1.6; cx=W/2; cy=H*.69+R;
+  const r=rng(42), n=Math.round(W*H/7000);
+  sc.clearRect(0,0,W,H);
+  for(let i=0;i<n;i++){
+    const big=r()<.06; sc.globalAlpha=big?.9:.25+r()*.45; sc.fillStyle='#fff';
+    sc.beginPath(); sc.arc(r()*W,r()*H*.8,big?1.1:.35+r()*.5,0,7); sc.fill();
+  }
+  drawPlanet();
+}
+function drawPlanet(){
+  pc.globalCompositeOperation='source-over'; pc.clearRect(0,0,W,H);
+  const sx=sun*W, sy=cy-Math.sqrt(R*R-(sx-cx)**2);
+  const a=R*.93, z=R*1.04, f=v=>(v-a)/(z-a);
+  const g=pc.createRadialGradient(cx,cy,a,cx,cy,z);
+  g.addColorStop(0,'rgba(30,60,140,0)');
+  g.addColorStop(f(R*.994),'rgba(80,120,220,.4)');
+  g.addColorStop(f(R),'rgba(215,228,255,1)');
+  g.addColorStop(f(R*1.005),'rgba(120,160,255,.55)');
+  g.addColorStop(f(R*1.02),'rgba(60,100,230,.12)');
+  g.addColorStop(1,'rgba(40,80,220,0)');
+  pc.fillStyle=g; pc.fillRect(0,0,W,H);
+  pc.globalCompositeOperation='destination-in';
+  const m=pc.createRadialGradient(sx,sy,0,sx,sy,Math.max(W,H)*.95);
+  m.addColorStop(0,'rgba(0,0,0,1)'); m.addColorStop(.45,'rgba(0,0,0,.4)'); m.addColorStop(1,'rgba(0,0,0,.05)');
+  pc.fillStyle=m; pc.fillRect(0,0,W,H);
+  pc.globalCompositeOperation='destination-over';
+  const b=pc.createRadialGradient(sx,sy,0,sx,sy,Math.max(W,H)*.8);
+  b.addColorStop(0,'#0d1628'); b.addColorStop(.35,'#04070d'); b.addColorStop(1,'#000');
+  pc.fillStyle=b; pc.beginPath(); pc.arc(cx,cy,R,0,7); pc.fill();
+  pc.globalCompositeOperation='source-over';
+  const s=pc.createRadialGradient(sx,sy,0,sx,sy,Math.min(W,H)*.32);
+  s.addColorStop(0,'rgba(255,255,255,.95)'); s.addColorStop(.03,'rgba(255,248,236,.55)');
+  s.addColorStop(.18,'rgba(170,195,255,.12)'); s.addColorStop(1,'rgba(120,150,255,0)');
+  pc.fillStyle=s; pc.fillRect(0,0,W,H);
+  const fl=pc.createLinearGradient(sx-W*.35,0,sx+W*.35,0);
+  fl.addColorStop(0,'rgba(200,215,255,0)'); fl.addColorStop(.5,'rgba(235,242,255,.5)'); fl.addColorStop(1,'rgba(200,215,255,0)');
+  pc.fillStyle=fl; pc.fillRect(sx-W*.35,sy-.6,W*.7,1.2);
+}
+addEventListener('resize',size);
+size();
+(function loop(){
+  const d=sunTarget-sun;
+  if(Math.abs(d)>.0005){ sun+= still?d:d*.06; drawPlanet(); }
+  requestAnimationFrame(loop);
+})();
+
+build();
+go(0,0);
+</script>
+</body>
+</html>

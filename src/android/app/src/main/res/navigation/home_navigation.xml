@@ -18,6 +18,11 @@
             app:popExitAnim="@anim/nav_default_pop_exit_anim" />
 
     <fragment
+        android:id="@+id/orbitHomeFragment"
+        android:name="org.yuzu.yuzu_emu.ui.OrbitHomeFragment"
+        android:label="OrbitHomeFragment" />
+
+    <fragment
         android:id="@+id/homeSettingsFragment"
         android:name="org.yuzu.yuzu_emu.fragments.HomeSettingsFragment"
         android:label="HomeSettingsFragment" />
