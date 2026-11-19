@@ -1175,6 +1175,8 @@
     <string name="banana_pack_import_failed_message">Nothing was changed. %1$s</string>
     <string name="banana_pack_import_unavailable">This build of Hokkaido has no Banana Native.</string>
     <string name="banana_pack_import_unreadable">The picked file can\'t be read.</string>
+    <string name="banana_shaders_build">Build all shaders now</string>
+    <string name="banana_shaders_build_description">Banana Native translates every shader of the game ahead of play, so new scenes don\'t show up white or with parts missing while their shaders are built. Takes a while; best on the charger.</string>
     <string name="game_engine_description">Which engine runs this game: Hokkaido emulates the Switch 2 GPU; Banana Native runs the game\'s code natively and draws with Vulkan (its games need preparing once). Auto picks what we consider best.</string>
     <string name="game_engine_auto">Auto</string>
     <string name="game_engine_auto_now">Auto (%1$s)</string>
