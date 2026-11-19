@@ -17,7 +17,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/add_button"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Orbit.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -30,7 +30,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/remove_all_button"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Orbit.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginStart="8dp"

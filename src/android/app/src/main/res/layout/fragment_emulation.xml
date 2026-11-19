@@ -145,7 +145,7 @@
 
             <Button
                 android:id="@+id/done_control_config"
-                style="@style/Widget.Material3.Button.ElevatedButton"
+                style="@style/Orbit.Button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"

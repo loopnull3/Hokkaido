@@ -12,10 +12,10 @@
     android:clickable="true"
     android:focusable="true"
     app:cardCornerRadius="16dp"
-    app:cardBackgroundColor="@android:color/transparent"
+    app:cardBackgroundColor="?attr/colorSurfaceContainer"
     app:cardElevation="0dp"
-    app:strokeColor="?attr/colorOutline"
-    app:strokeWidth="1dp">
+    app:strokeColor="@color/orbit_focus_ring"
+    app:strokeWidth="2dp">
 
     <LinearLayout
         android:id="@+id/option_layout"

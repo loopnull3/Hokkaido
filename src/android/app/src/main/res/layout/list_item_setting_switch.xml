@@ -5,6 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/theme_list_item_selector"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="3dp"
     android:clickable="true"
     android:focusable="true"
     android:minHeight="72dp"
@@ -59,7 +61,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_clear"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Orbit.Button.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"

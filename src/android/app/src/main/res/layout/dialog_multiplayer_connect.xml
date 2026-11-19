@@ -49,7 +49,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_lobby_browser"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="@style/Orbit.Button.Secondary"
                 android:layout_width="175dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -80,7 +80,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_join"
-                style="@style/Widget.Material3.Button.ElevatedButton"
+                style="@style/Orbit.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -98,7 +98,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_create"
-                style="@style/Widget.Material3.Button.ElevatedButton"
+                style="@style/Orbit.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

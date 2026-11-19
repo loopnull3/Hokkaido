@@ -13,7 +13,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/fx_add"
-        style="@style/Widget.Material3.Button.TonalButton"
+        style="@style/Orbit.Button.Secondary"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
@@ -28,7 +28,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/fx_presets"
-        style="@style/Widget.Material3.Button.TonalButton"
+        style="@style/Orbit.Button.Secondary"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_marginStart="8dp"
@@ -45,7 +45,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/fx_create_preset"
-        style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+        style="@style/Orbit.IconButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginStart="8dp"
@@ -54,7 +54,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/fx_remove_all"
-        style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+        style="@style/Orbit.IconButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginStart="8dp"

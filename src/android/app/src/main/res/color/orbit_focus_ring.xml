@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The white ring the console home draws around the tile the controller is on -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="?attr/colorOnSurface" android:state_focused="true" />
+    <item android:color="?attr/colorOnSurface" android:state_checked="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

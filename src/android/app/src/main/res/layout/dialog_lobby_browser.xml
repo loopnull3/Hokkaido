@@ -45,7 +45,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/refresh_button"
-                        style="@style/Widget.Material3.Button.IconButton"
+                        style="@style/Orbit.IconButton.Plain"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_gravity="center"
@@ -243,7 +243,7 @@
             android:layout_marginTop="16dp"
             android:text="@string/refresh"
             app:icon="@drawable/ic_refresh"
-            style="@style/Widget.Material3.Button.ElevatedButton" />
+            style="@style/Orbit.Button" />
     </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

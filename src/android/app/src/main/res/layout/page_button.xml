@@ -5,4 +5,4 @@
     android:layout_marginBottom="16dp"
     app:iconTint="?attr/colorOnPrimary"
     app:iconSize="24dp"
-    style="@style/Widget.Material3.Button.UnelevatedButton" />
+    style="@style/Orbit.Button" />

@@ -64,6 +64,24 @@
         <item name="shapeAppearanceCornerLarge">@style/OrbitCorner.Large</item>
         <item name="shapeAppearanceCornerExtraLarge">@style/OrbitCorner.ExtraLarge</item>
         <item name="android:textColorSecondary">@color/orbit_secondary_label</item>
+        <!-- Widgets as the console home's (values/orbit_styles.xml) -->
+        <item name="materialButtonStyle">@style/Orbit.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Orbit.Button.Secondary</item>
+        <item name="materialIconButtonStyle">@style/Orbit.IconButton.Plain</item>
+        <item name="materialIconButtonFilledStyle">@style/Orbit.IconButton</item>
+        <item name="materialIconButtonFilledTonalStyle">@style/Orbit.IconButton</item>
+        <item name="materialCardViewStyle">@style/Orbit.Card</item>
+        <item name="materialCardViewElevatedStyle">@style/Orbit.Card</item>
+        <item name="materialCardViewFilledStyle">@style/Orbit.Card</item>
+        <item name="materialCardViewOutlinedStyle">@style/Orbit.Card</item>
+        <item name="toolbarStyle">@style/Orbit.Toolbar</item>
+        <item name="materialSwitchStyle">@style/Orbit.Switch</item>
+        <item name="floatingActionButtonStyle">@style/Orbit.FloatingActionButton</item>
+        <item name="extendedFloatingActionButtonStyle">@style/Orbit.ExtendedFloatingActionButton</item>
+        <item name="textInputStyle">@style/Orbit.TextInput</item>
+        <item name="linearProgressIndicatorStyle">@style/Orbit.LinearProgress</item>
+        <item name="chipStyle">@style/Orbit.Chip</item>
+        <item name="bottomSheetDialogTheme">@style/Orbit.BottomSheetDialog</item>
         <!-- Outline and borders -->
         <item name="colorOutline">@color/eden_border</item>
         <item name="colorOutlineVariant">@color/eden_border_light</item>
@@ -86,7 +104,7 @@
         <!-- Material dialog theme -->
         <item name="materialAlertDialogTheme">@style/EdenMaterialDialog</item>
         <!-- Popup menu theme -->
-        <item name="popupMenuStyle">@style/EdenPopupMenu</item>
+        <item name="popupMenuStyle">@style/Orbit.PopupMenu</item>
         <item name="android:textColorPrimary">@color/eden_on_background</item>
         <item name="android:itemTextAppearance">@style/TextAppearance.Material3.BodyLarge</item>
     </style>

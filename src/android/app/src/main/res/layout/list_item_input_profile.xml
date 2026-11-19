@@ -35,7 +35,7 @@
 
         <Button
             android:id="@+id/button_new"
-            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+            style="@style/Orbit.IconButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/create_new_profile"
@@ -44,7 +44,7 @@
 
         <Button
             android:id="@+id/button_delete"
-            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+            style="@style/Orbit.IconButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/delete"
@@ -53,7 +53,7 @@
 
         <Button
             android:id="@+id/button_save"
-            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+            style="@style/Orbit.IconButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/save"
@@ -62,7 +62,7 @@
 
         <Button
             android:id="@+id/button_load"
-            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+            style="@style/Orbit.IconButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/load"

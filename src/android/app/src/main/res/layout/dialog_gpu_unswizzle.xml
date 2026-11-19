@@ -20,7 +20,7 @@
 
         <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/layout_texture_size"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+        style="@style/Orbit.TextInput.Dropdown"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
@@ -35,7 +35,7 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/layout_stream_size"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            style="@style/Orbit.TextInput.Dropdown"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -50,7 +50,7 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/layout_chunk_size"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            style="@style/Orbit.TextInput.Dropdown"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/gpu_unswizzle_chunk_size">
@@ -72,21 +72,21 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_default"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Orbit.Button.Text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/gpu_unswizzle_default_button" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_cancel"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Orbit.Button.Text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@android:string/cancel" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_ok"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Orbit.Button.Text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@android:string/ok" />

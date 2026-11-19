@@ -42,7 +42,7 @@
                 android:layout_height="128dp"
                 android:layout_gravity="center_horizontal"
                 android:layout_marginBottom="24dp"
-                style="@style/Widget.Material3.CardView.Elevated"
+                style="@style/Orbit.Card"
                 app:cardCornerRadius="64dp"
                 app:cardElevation="4dp">
 
@@ -75,7 +75,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/profile_select_image"
-                        style="@style/Widget.Material3.Button.TonalButton"
+                        style="@style/Orbit.Button.Secondary"
                         app:icon="@drawable/ic_add"
                         android:layout_marginEnd="4dp" />
 
@@ -85,7 +85,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/profile_firmware_avatars"
-                        style="@style/Widget.Material3.Button.TonalButton"
+                        style="@style/Orbit.Button.Secondary"
                         app:icon="@drawable/ic_account_circle"
                         android:layout_marginStart="4dp"
                         android:visibility="gone" />
@@ -98,7 +98,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="@string/profile_revert_image"
-                    style="@style/Widget.Material3.Button.TextButton"
+                    style="@style/Orbit.Button.Text"
                     android:visibility="gone" />
 
             </LinearLayout>
@@ -124,7 +124,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                style="@style/Widget.Material3.CardView.Filled"
+                style="@style/Orbit.Card"
                 app:cardCornerRadius="16dp">
 
                 <LinearLayout
@@ -162,7 +162,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/profile_generate"
-                            style="@style/Widget.Material3.Button.TextButton"
+                            style="@style/Orbit.Button.Text"
                             app:icon="@drawable/ic_refresh"
                             app:iconGravity="textStart" />
 
@@ -189,7 +189,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        style="@style/Widget.Material3.CardView.Elevated"
+        style="@style/Orbit.Card"
         app:cardCornerRadius="0dp"
         app:cardElevation="8dp">
 
@@ -208,7 +208,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
                 android:text="@android:string/cancel"
-                style="@style/Widget.Material3.Button.TonalButton" />
+                style="@style/Orbit.Button.Secondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_save"
@@ -217,7 +217,7 @@
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
                 android:text="@string/save"
-                style="@style/Widget.Material3.Button" />
+                style="@style/Orbit.Button" />
 
         </LinearLayout>
 

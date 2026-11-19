@@ -64,7 +64,7 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            style="@style/Orbit.TextInput.Dropdown"
             android:id="@+id/preferred_game_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -132,7 +132,7 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/lobby_visibility"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            style="@style/Orbit.TextInput.Dropdown"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:hint="@string/multiplayer_lobby_type"
@@ -151,6 +151,6 @@
             android:layout_height="wrap_content"
             android:text="@android:string/ok"
             android:layout_gravity="center"
-            style="@style/Widget.Material3.Button.ElevatedButton" />
+            style="@style/Orbit.Button" />
     </LinearLayout>
 </ScrollView>

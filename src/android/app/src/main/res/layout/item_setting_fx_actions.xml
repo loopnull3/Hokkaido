@@ -10,7 +10,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/fx_reset"
-        style="@style/Widget.Material3.Button.TonalButton"
+        style="@style/Orbit.Button.Secondary"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:ellipsize="end"

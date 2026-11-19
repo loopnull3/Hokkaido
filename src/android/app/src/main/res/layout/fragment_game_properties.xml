@@ -30,29 +30,27 @@
 
                 <Button
                     android:id="@+id/button_back"
-                    style="?attr/materialIconButtonStyle"
+                    style="@style/Orbit.IconButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="@android:color/transparent"
                     app:icon="@drawable/ic_back"
                     app:iconSize="24dp"
                     app:iconTint="?attr/colorOnSurface"
-                    app:strokeColor="?attr/colorOutline"
-                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/orbit_focus_ring"
+                    app:strokeWidth="2dp"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
                 <Button
                     android:id="@+id/button_shortcut"
-                    style="?attr/materialIconButtonStyle"
+                    style="@style/Orbit.IconButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="@android:color/transparent"
                     app:icon="@drawable/ic_shortcut"
                     app:iconSize="24dp"
                     app:iconTint="?attr/colorOnSurface"
-                    app:strokeColor="?attr/colorOutline"
-                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/orbit_focus_ring"
+                    app:strokeWidth="2dp"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
