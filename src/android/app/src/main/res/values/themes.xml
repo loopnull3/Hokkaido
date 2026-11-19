@@ -49,7 +49,21 @@
         <item name="colorSurface">@color/eden_surface</item>
         <item name="colorOnSurface">@color/eden_on_surface</item>
         <item name="colorSurfaceVariant">@color/eden_surface_variant</item>
-        <item name="colorOnSurfaceVariant">@color/eden_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/orbit_secondary_label</item>
+        <!-- Surface levels: the console home's fills (cards, sheets, pressed) over a black background -->
+        <item name="colorSurfaceContainerLowest">@color/eden_background</item>
+        <item name="colorSurfaceContainerLow">@color/orbit_container_low</item>
+        <item name="colorSurfaceContainer">@color/orbit_container</item>
+        <item name="colorSurfaceContainerHigh">@color/orbit_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/orbit_container_highest</item>
+        <item name="colorSurfaceBright">@color/orbit_container_high</item>
+        <item name="colorSurfaceDim">@color/eden_background</item>
+        <!-- Rounded shapes, as the home's tiles and sheets -->
+        <item name="shapeAppearanceCornerSmall">@style/OrbitCorner.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/OrbitCorner.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/OrbitCorner.Large</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/OrbitCorner.ExtraLarge</item>
+        <item name="android:textColorSecondary">@color/orbit_secondary_label</item>
         <!-- Outline and borders -->
         <item name="colorOutline">@color/eden_border</item>
         <item name="colorOutlineVariant">@color/eden_border_light</item>

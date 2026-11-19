@@ -104,8 +104,12 @@ object ThemeHelper {
         }
     }
 
+    /** The default theme (the static colour Hokkaido): the console home's Orbit palette, which is dark only. */
+    private fun isOrbit(): Boolean =
+        Theme.from(IntSetting.THEME.getInt()) == Theme.Default && IntSetting.STATIC_THEME_COLOR.getInt(false) == 0
+
     fun setThemeMode(activity: AppCompatActivity) {
-        val themeMode = IntSetting.THEME_MODE.getInt()
+        val themeMode = if (isOrbit()) AppCompatDelegate.MODE_NIGHT_YES else IntSetting.THEME_MODE.getInt()
         activity.delegate.localNightMode = themeMode
         val windowController = WindowCompat.getInsetsController(
             activity.window,
