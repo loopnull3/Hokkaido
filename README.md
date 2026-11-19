@@ -59,6 +59,9 @@ The performance work tested on the S26's Exynos carries over well to Snapdragon:
 
 Other phones may work, but these are the only devices Hokkaido is tested on so far.
 
+- **Mali GPUs (user reports):** on the Xiaomi 18 Fold (Mali-G2-Ultra), the stock driver shows a black picture in Fire Emblem: Fortune's Weave; players report that it draws with [faux123's PanVK driver](https://github.com/faux123/panvk-faux123-driver-rp4pro), installed through the GPU driver manager (issue #22).
+- **Vulkan 1.3 is required.** A phone whose stock driver reports an older Vulkan version (for example 1.1 on some Snapdragon 8 Gen 1 tablets) needs a newer driver, such as a Turnip build for Adreno.
+
 > 📺 **Game Testing & Video Footage:** Check out gameplay tests and video showcases on the [Exynos Gaming YouTube Channel](https://www.youtube.com/@ExynosGaming-t7k).
 
 ## Game status
