@@ -328,6 +328,7 @@ public final class HokkaidoBridge {
             Prefs.of(c).edit().putString(given, window).commit();
         }
         startingSettings(c, id);
+        if (plan.game.packDir != null && ShaderLibs.layerCovers(id, Prefs.layerEnv(c, id))) dropOldShaders(new File(plan.game.packDir));
         String driverName = null;
         if (driverZip == null || driverZip.isEmpty()) {
             GpuDriver.choice(c, id, GpuDriver.SYSTEM);
@@ -344,6 +345,28 @@ public final class HokkaidoBridge {
         boolean first = Prefs.folder(c, "save_" + id) == null;
         if (first && isEmpty(shared) && !own.getAbsoluteFile().equals(shared.getAbsoluteFile()) && !isEmpty(own)) copyTree(own, shared);
         Prefs.folder(c, "save_" + id, shared.getPath());
+    }
+
+    /** Raised when Hokkaido's changes to the shader tools (pack_tools) change what they build: a game's shaders are then built again once. */
+    private static final String SHADER_TOOLS_MARK = "hokkaido-shader-tools-1";
+
+    /**
+     * Shaders built before Hokkaido's NaN-exact min / max / clamp (pack_tools/nan_exact.py) carry the release tools' version stamp, so nothing
+     * builds them again by itself: the pack's libraries (shaders/v-*) and the shader layer's (shaders/layer/lib) are removed once. The layer keeps
+     * its requests and builds them again while the game plays (or Build all shaders now). Only for a game the layer covers, which plays without
+     * a library meanwhile.
+     */
+    private static void dropOldShaders(File packDir) {
+        File sh = new File(packDir, "shaders"), mark = new File(sh, SHADER_TOOLS_MARK);
+        if (mark.isFile()) return;
+        File[] libs = sh.listFiles(f -> f.isDirectory() && f.getName().startsWith("v-"));
+        if (libs != null) for (File d : libs) Mods.deleteTree(d);
+        Mods.deleteTree(new File(sh, "layer/lib"));
+        try {
+            if (sh.isDirectory() || sh.mkdirs()) mark.createNewFile();
+        } catch (IOException e) {
+            // no mark: dropped again at the next start
+        }
     }
 
     /** The starting settings' version (startingSettings): raised when they change, so a game takes the new ones once. */
