@@ -1977,8 +1977,7 @@ void BufferCache<P>::UpdateIndexBuffer() {
             inline_buffer_id = CreateBuffer(0, buffer_size, false);
         }
         if (slot_buffers[inline_buffer_id].SizeBytes() < buffer_size) [[unlikely]] {
-            ++buffer_deletions;
-            slot_buffers.erase(inline_buffer_id);
+            DeleteBuffer(inline_buffer_id);
             inline_buffer_id = CreateBuffer(0, buffer_size, false);
         }
         channel_state->index_buffer = Binding{
@@ -2325,7 +2324,7 @@ auto BufferCache<P>::Nx2ReadListCopy(DAddr device_addr, std::span<u8> out, bool 
             return Nx2ListRead::Unknown;
         }
         const auto current = [&](const Nx2ListPage& entry) {
-            return entry.copy && !entry.draw_written && entry.copy_writes == entry.writes &&
+            return entry.copy && entry.copy_writes == entry.writes &&
                    offset >= entry.copy_begin && offset + out.size() <= entry.copy_end;
         };
         u64 tick{};
@@ -2346,8 +2345,8 @@ auto BufferCache<P>::Nx2ReadListCopy(DAddr device_addr, std::span<u8> out, bool 
                 if (!past_sync) {
                     return Nx2ListRead::NeedsSync;
                 }
-                return entry.synced_writes == entry.writes ? Nx2ListRead::Synced
-                                                           : Nx2ListRead::Unknown;
+                // Past the sync the back noted every write the list can see: a copy made after
+                // the last of them holds the page, without a flush and Scheduler::Finish.
             }
             // Pages the CPU writes the lists of (GPU-written once, long before) stay synced.
             if (entry.synced_writes == entry.writes) {
@@ -3125,6 +3124,9 @@ void BufferCache<P>::DeleteBuffer(BufferId buffer_id, bool do_not_mark) {
     }
 
     Unregister(buffer_id);
+    if (buffer_id == inline_buffer_id) {
+        inline_buffer_id = NULL_BUFFER_ID;
+    }
 
 #ifdef YUZU_LEGACY
     if (!do_not_mark || !immediately_free)

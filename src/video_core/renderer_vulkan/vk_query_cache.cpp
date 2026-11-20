@@ -92,10 +92,11 @@ public:
     // made the wait spin forever inside RADV with all GPU work finished (Ocarina of Time froze
     // right after its intro on Xclipse; their begin and end were recorded into a submission the GPU
     // had finished, and no reset came after). Such slots read as 0 after a while and are logged.
-    // Once the GPU has finished the bank's last submission, a slot that is still not available
-    // never will be: stop shortly after that instead of at the 2 s deadline. Fire Emblem:
-    // Fortune's Weave (04007EF01F8AE000) hit it on nearly every frame and ran at 0 FPS.
-    void Sync(size_t start, size_t size) {
+    // Once the GPU has finished the submission that wrote these slots (written_tick), a slot that
+    // is still not available never will be: stop shortly after that instead of at the 2 s
+    // deadline. Fire Emblem: Fortune's Weave (04007EF01F8AE000) hit it on nearly every frame and
+    // ran at 0 FPS.
+    void Sync(size_t start, size_t size, u64 written_tick) {
         const auto& dev = device.GetLogical();
         std::vector<std::array<u64, 2>> results(size);
         auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
@@ -104,7 +105,7 @@ public:
             if (!gpu_done && (spins & 63) == 0) {
                 scheduler.GetMasterSemaphore().Refresh();
             }
-            if (!gpu_done && scheduler.IsFree(last_used_tick)) {
+            if (!gpu_done && scheduler.IsFree(written_tick)) {
                 gpu_done = true;
                 deadline = (std::min)(deadline, std::chrono::steady_clock::now() +
                                                     std::chrono::milliseconds{2});
@@ -145,9 +146,9 @@ public:
             if (logged++ < 32) {
                 LOG_WARNING(Render_Vulkan,
                             "Occlusion query bank {}: {} of slots {}..{} never became available "
-                            "(first {}); read as 0. GPU tick {}, last used tick {}",
+                            "(first {}); read as 0. GPU tick {}, written tick {}",
                             index, unavailable, start, start + size - 1, start + first_unavailable,
-                            scheduler.GetMasterSemaphore().KnownGpuTick(), last_used_tick);
+                            scheduler.GetMasterSemaphore().KnownGpuTick(), written_tick);
             }
         }
     }
@@ -486,19 +487,25 @@ public:
         {
             std::scoped_lock lk(flush_guard);
             pending_flush_sets.emplace_back(std::move(pending_flush_queries));
+            pending_flush_ticks.push_back(scheduler.CurrentTick());
         }
     }
 
     void PopUnsyncedQueries() override {
         std::vector<size_t> current_flush_queries;
+        u64 written_tick;
         {
             std::scoped_lock lk(flush_guard);
             current_flush_queries = std::move(pending_flush_sets.front());
             pending_flush_sets.pop_front();
+            written_tick = pending_flush_ticks.front();
+            pending_flush_ticks.pop_front();
         }
-        ApplyBanksWideOp<false>(
-            current_flush_queries,
-            [](SamplesQueryBank* bank, size_t start, size_t amount) { bank->Sync(start, amount); });
+        ApplyBanksWideOp<false>(current_flush_queries,
+                                [written_tick](SamplesQueryBank* bank, size_t start,
+                                               size_t amount) {
+                                    bank->Sync(start, amount, written_tick);
+                                });
         for (auto q : current_flush_queries) {
             auto* query = GetQuery(q);
             u64 total = 0;
@@ -721,6 +728,7 @@ private:
     // flush levels
     std::vector<size_t> pending_flush_queries;
     std::deque<std::vector<size_t>> pending_flush_sets;
+    std::deque<u64> pending_flush_ticks; ///< Tick that recorded each set; guarded by flush_guard
 
     // State Machine
     size_t current_bank_slot;

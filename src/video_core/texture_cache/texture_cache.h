@@ -7,6 +7,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <numeric>
 #include <cstdlib>
 #include <limits>
@@ -170,21 +171,37 @@ void TextureCache<P>::RunGarbageCollector(bool out_of_memory) {
         bool sparse;
     };
     std::vector<PendingDownload> downloads;
-    const auto Cleanup = [this, &num_iterations, &high_priority_mode, &aggressive_mode,
-                          &evict_old_costly, &downloads, out_of_memory](ImageId image_id) {
-        if (num_iterations == 0) {
-            return true;
-        }
-        --num_iterations;
-        auto& image = slot_images[image_id];
+    const auto CanEvict = [this, &high_priority_mode, &aggressive_mode,
+                           &evict_old_costly](ImageId image_id, bool* out_must_download = nullptr) {
+        const auto& image = slot_images[image_id];
         if (True(image.flags & ImageFlagBits::IsDecoding)) {
             return false;
         }
-        const bool must_download = IsDownloadable(image) && False(image.flags & ImageFlagBits::BadOverlap);
-        if ((!aggressive_mode && !evict_old_costly && True(image.flags & ImageFlagBits::CostlyLoad)) ||
+        const bool must_download =
+            IsDownloadable(image) && False(image.flags & ImageFlagBits::BadOverlap);
+        if (out_must_download != nullptr) {
+            *out_must_download = must_download;
+        }
+        if ((!aggressive_mode && !evict_old_costly &&
+             True(image.flags & ImageFlagBits::CostlyLoad)) ||
             (!high_priority_mode && must_download)) {
             return false;
         }
+        return true;
+    };
+    // Images this pass may not evict cost no iteration: 10-20 CostlyLoad (ASTC) images at the
+    // oldest end used to end the pass with nothing deleted.
+    const auto Cleanup = [this, &num_iterations, &high_priority_mode, &aggressive_mode, &CanEvict,
+                          &downloads, out_of_memory](ImageId image_id) {
+        if (num_iterations == 0) {
+            return true;
+        }
+        bool must_download = false;
+        if (!CanEvict(image_id, &must_download)) {
+            return false;
+        }
+        --num_iterations;
+        auto& image = slot_images[image_id];
         if (must_download) {
             auto map = runtime.DownloadStagingBuffer(image.unswizzled_size_bytes);
             auto copies = FullDownloadCopies(image.info);
@@ -204,6 +221,15 @@ void TextureCache<P>::RunGarbageCollector(bool out_of_memory) {
         }
         if (True(image.flags & ImageFlagBits::Tracked)) {
             UntrackImage(image, image_id);
+        }
+        if constexpr (requires(const Image& img) { img.MemoryBlock(); }) {
+            const auto block = image.MemoryBlock();
+            if (block.block != 0) {
+                const auto it = block_image_bytes.find(block.block);
+                if (it != block_image_bytes.end()) {
+                    it->second -= (std::min)(it->second, block.size);
+                }
+            }
         }
         ++(True(image.flags & ImageFlagBits::CostlyLoad) ? gc_costly_deletes : gc_deletes);
         UnregisterImage(image_id);
@@ -227,12 +253,19 @@ void TextureCache<P>::RunGarbageCollector(bool out_of_memory) {
     // used). Among the oldest candidates (8 per image this pass may delete), those in the
     // emptiest blocks go first, so blocks drain and go back to the driver; placement already
     // prefers the fullest blocks (best fit). Images with memory of their own sit in the middle.
-    const auto Collect = [&] {
+    const auto Collect = [&](u64 age_override = 0) {
+        const u64 required_age = age_override != 0 ? age_override : ticks_to_destroy;
+        if (num_iterations == 0 || frame_tick < required_age) {
+            return;
+        }
+        const u64 last_tick = frame_tick - required_age;
         if constexpr (requires(const Image& image) { image.MemoryBlock(); }) {
             std::vector<ImageId> candidates;
             const size_t limit = num_iterations * 8;
-            lru_cache.ForEachItemBelow(frame_tick - ticks_to_destroy, [&](ImageId image_id) {
-                candidates.push_back(image_id);
+            lru_cache.ForEachItemBelow(last_tick, [&](ImageId image_id) {
+                if (CanEvict(image_id)) {
+                    candidates.push_back(image_id);
+                }
                 return candidates.size() >= limit;
             });
             if (candidates.empty()) {
@@ -269,7 +302,7 @@ void TextureCache<P>::RunGarbageCollector(bool out_of_memory) {
                 }
             }
         } else {
-            lru_cache.ForEachItemBelow(frame_tick - ticks_to_destroy, Cleanup);
+            lru_cache.ForEachItemBelow(last_tick, Cleanup);
         }
     };
     Configure(false);
@@ -279,7 +312,7 @@ void TextureCache<P>::RunGarbageCollector(bool out_of_memory) {
     }();
     if (high_priority_mode && old_age != 0 && frame_tick > old_age) {
         evict_old_costly = true;
-        lru_cache.ForEachItemBelow(frame_tick - old_age, Cleanup);
+        Collect(old_age);
         evict_old_costly = false;
     }
     Collect();
@@ -862,8 +895,8 @@ void TextureCache<P>::MemoizeTextures(SampledTextureMemo& memo,
         const auto [view_index, sampler_index] = Tegra::Texture::TexturePair(reads[i].raw, via_header_index);
         const u32 tic_index =
             Tegra::Texture::TextureHeaderIndex(view_index, image_table.current_limit, native_tiling);
-        if (!views[i].id || !samplers[i] || tic_index > image_table.current_limit ||
-            sampler_index > sampler_table.current_limit) {
+        if (!views[i].id || !samplers[i] || !image_table.ContainsIndex(tic_index) ||
+            !sampler_table.ContainsIndex(sampler_index)) {
             return;
         }
         SampledTextureMemo::Entry entry{
@@ -1003,13 +1036,13 @@ bool TextureCache<P>::SamplesRenderTarget(std::span<const ImageViewInOut> views)
 
 template <class P>
 typename P::Sampler* TextureCache<P>::GetSampler(u32 index, bool compute) {
-    return &slot_samplers[GetSamplerId(index, compute)];
+    return &GetSampler(GetSamplerId(index, compute));
 }
 
 template <class P>
 SamplerId TextureCache<P>::GetSamplerId(u32 index, bool compute) {
     auto& table = compute ? channel_state->compute_sampler_table : channel_state->graphics_sampler_table;
-    if (index > table.current_limit) {
+    if (!table.ContainsIndex(index)) {
         LOG_TRACE(HW_GPU, "Invalid sampler index={}", index);
         return NULL_SAMPLER_ID;
     }
@@ -1024,12 +1057,19 @@ SamplerId TextureCache<P>::GetSamplerId(u32 index, bool compute) {
 
 template <class P>
 const typename P::Sampler& TextureCache<P>::GetSampler(SamplerId id) const noexcept {
+    if (!slot_samplers.contains(id)) {
+        static std::atomic<u32> logged{};
+        if (logged.fetch_add(1, std::memory_order_relaxed) < 20) {
+            LOG_ERROR(HW_GPU, "Invalid sampler id {:#x}, using the null sampler", id.index);
+        }
+        return slot_samplers[NULL_SAMPLER_ID];
+    }
     return slot_samplers[id];
 }
 
 template <class P>
 typename P::Sampler& TextureCache<P>::GetSampler(SamplerId id) noexcept {
-    return slot_samplers[id];
+    return const_cast<Sampler&>(std::as_const(*this).GetSampler(id));
 }
 
 template <class P>
@@ -1247,7 +1287,7 @@ ImageViewId TextureCache<P>::VisitImageView(u32 index, bool compute) {
     auto& table = compute ? channel_state->compute_image_table : channel_state->graphics_image_table;
     index = Tegra::Texture::TextureHeaderIndex(index, table.current_limit,
                                                gpu_memory->UsesNativeTiling());
-    if (index > table.current_limit) {
+    if (!table.ContainsIndex(index)) {
         LOG_TRACE(HW_GPU, "Invalid image view index={}", index);
         return NULL_IMAGE_VIEW_ID;
     }
@@ -1333,6 +1373,15 @@ void TextureCache<P>::WriteMemory(DAddr cpu_addr, size_t size) {
             UntrackImage(image, image_id);
         }
     });
+}
+
+template <class P>
+void TextureCache<P>::WriteGpuMemory(GPUVAddr gpu_addr, size_t size) {
+    for (const auto& [piece_addr, piece_size] : gpu_memory->GetSubmappedRange(gpu_addr, size)) {
+        if (const auto device_addr = gpu_memory->GpuToCpuAddress(piece_addr)) {
+            WriteMemory(*device_addr, piece_size);
+        }
+    }
 }
 
 template <class P>
@@ -3977,6 +4026,10 @@ void TextureCache<P>::UnregisterImage(ImageId image_id) {
     image.flags &= ~ImageFlagBits::Registered;
     image.flags &= ~ImageFlagBits::BadOverlap;
     lru_cache.Free(image.lru_index);
+    const std::optional<size_t> storage_id = getStorageID(image.address_space);
+    ASSERT(storage_id);
+    TextureCacheGPUMap& gpu_page_table = gpu_page_table_storage[*storage_id * 2];
+    TextureCacheGPUMap& sparse_page_table = gpu_page_table_storage[*storage_id * 2 + 1];
     bool reported_missing_page = false;
     const auto& clear_page_table =
         [this, image_id, &image, &reported_missing_page](u64 page, ::Common::unordered_map<u64, std::vector<ImageId>, Common::IdentityHash<u64>>& selected_page_table) {
@@ -3997,9 +4050,10 @@ void TextureCache<P>::UnregisterImage(ImageId image_id) {
             }
             image_ids.erase(vector_it);
         };
-    ForEachGPUPage(image.gpu_addr, image.guest_size_bytes, [this, &clear_page_table](u64 page) {
-        clear_page_table(page, (*channel_state->gpu_page_table));
-    });
+    ForEachGPUPage(image.gpu_addr, image.guest_size_bytes,
+                   [&clear_page_table, &gpu_page_table](u64 page) {
+                       clear_page_table(page, gpu_page_table);
+                   });
     if (False(image.flags & ImageFlagBits::Sparse)) {
         const auto map_id = image.map_view_id;
         ForEachCPUPage(image.cpu_addr, image.guest_size_bytes, [this, map_id](u64 page) {
@@ -4020,9 +4074,10 @@ void TextureCache<P>::UnregisterImage(ImageId image_id) {
         slot_map_views.erase(map_id);
         return;
     }
-    ForEachGPUPage(image.gpu_addr, image.guest_size_bytes, [this, &clear_page_table](u64 page) {
-        clear_page_table(page, (*channel_state->sparse_page_table));
-    });
+    ForEachGPUPage(image.gpu_addr, image.guest_size_bytes,
+                   [&clear_page_table, &sparse_page_table](u64 page) {
+                       clear_page_table(page, sparse_page_table);
+                   });
     auto it = sparse_views.find(image_id);
     ASSERT(it != sparse_views.end());
     auto& sparse_maps = it->second;

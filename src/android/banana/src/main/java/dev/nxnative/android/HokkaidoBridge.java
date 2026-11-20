@@ -50,6 +50,30 @@ public final class HokkaidoBridge {
         ShaderLibs.appFiles = app.getExternalFilesDir(null);
         Readiness.minSdk = BuildConfig.NX_MIN_SDK;
         UpdateCheck.android12 = BuildConfig.NX_MIN_SDK < 33;
+        DumpCheck.workOverride = (dump, titleId) -> workFolder(app, dump, titleId);
+    }
+
+    /**
+     * Prepare's work folder for a dump: &lt;dump&gt;/../&lt;title ID&gt;-hokkaido-work. Banana Native's own app keeps its job in
+     * &lt;title ID&gt;-work beside the same dump; sharing it, each app resumed or overwrote the other's job, whose pack is in
+     * the other app's storage. An unfinished Prepare of this app in &lt;title ID&gt;-work (Hokkaido 0.7.0) goes on there.
+     */
+    static File workFolder(Context c, File dump, String titleId) {
+        File parent = dump.getAbsoluteFile().getParentFile();
+        File base = parent != null ? parent : dump;
+        File ours = new File(base, titleId + "-hokkaido-work"), shared = new File(base, titleId + "-work");
+        if (!ours.exists()) {
+            File jf = Job.fileOf(shared);
+            if (jf.isFile()) {
+                try {
+                    Job j = Job.read(jf);
+                    if (!"done".equals(j.state()) && SaveStore.inside(j.pack(), AppStorage.packs(c))) return shared;
+                } catch (IOException e) {
+                    // not a job of this app
+                }
+            }
+        }
+        return ours;
     }
 
     /**
@@ -448,6 +472,37 @@ public final class HokkaidoBridge {
     }
 
     /**
+     * The game options Banana Native shows on its own Game settings page, for Hokkaido's Game properties. They take
+     * effect at the game's next start. Soft textures is the game's Advanced row DM_VK_TEX_SOFT.
+     */
+    public static final int OPTION_FULL_VEGETATION = 0, OPTION_RAM_SAVER = 1, OPTION_SOFT_TEXTURES = 2, OPTION_RAM_SAVER_STRONG = 3;
+
+    /** Whether the game has the option: full vegetation only where its profile has a vegetation detail */
+    public static boolean hasOption(String titleId, int option) {
+        Profile p = Profile.of(titleId);
+        return p != null && (option != OPTION_FULL_VEGETATION || p.vegetationDetail);
+    }
+
+    public static boolean option(Context c, String titleId, int option) {
+        switch (option) {
+            case OPTION_FULL_VEGETATION: return Prefs.fullVegetation(c, titleId);
+            case OPTION_RAM_SAVER: return Prefs.ramSaver(c, titleId);
+            case OPTION_RAM_SAVER_STRONG: return Prefs.ramSaverStrong(c, titleId);
+            default: return "1".equals(AdvancedSettings.effective(c, "DM_VK_TEX_SOFT", titleId));
+        }
+    }
+
+    public static void setOption(Context c, String titleId, int option, boolean on) {
+        switch (option) {
+            case OPTION_FULL_VEGETATION: Prefs.fullVegetation(c, titleId, on); break;
+            // Strong includes the RAM saver, as on Banana Native's Game settings page
+            case OPTION_RAM_SAVER: Prefs.ramSaver(c, titleId, on); if (!on) Prefs.ramSaverStrong(c, titleId, false); break;
+            case OPTION_RAM_SAVER_STRONG: Prefs.ramSaverStrong(c, titleId, on); if (on) Prefs.ramSaver(c, titleId, true); break;
+            default: AdvancedSettings.set(c, "DM_VK_TEX_SOFT", titleId, on ? "1" : "0");
+        }
+    }
+
+    /**
      * Banana Native's Import pack (PackUi.importRun) for Hokkaido: a pack that Banana Native's own app exported (its
      * game's Manage › Export pack…, banana-pack-&lt;title ID&gt;-&lt;version&gt;.zip) or a pack folder, checked against the game
      * in dumpPath and put into this app's packs/&lt;title ID&gt;, which the game's next start finds first. Null when it is
@@ -696,8 +751,11 @@ public final class HokkaidoBridge {
         Found f = SaveUi.busy(id) ? null : found(c, game, id);
         if (f == null) return null;
         if (PackCheck.blocking(c, f.pack, game) != null && !(anyway && untested(c, f.pack, game) != null)) return null;
-        // A missing or older shader library blocks only a game the shader layer does not cover (FrontendLaunch.ready)
-        if (Pack.libraryBlock(f.packDir, id, Prefs.layerEnv(c, id)) != null) return null;
+        // A missing or older shader library blocks only a game the shader layer does not cover (FrontendLaunch.ready), and, as on Banana
+        // Native's own Home (MainActivity), not one whose older library still plays: its shader update is optional (Build all shaders now).
+        // Without this, every new shader chain sent the game to a Prepare that translated all its shaders again.
+        if (Pack.libraryBlock(f.packDir, id, Prefs.layerEnv(c, id)) != null
+                && Pack.playableLibrary(f.packDir, id) == null && Pack.legacyLibrary(f.packDir, id) == null) return null;
         if (f.card != null && GameList.samePath(f.card.gameDir, game.getPath())) return f.card;
         // A card of the same title and build at another path (another copy of the dump) is moved to the dump Hokkaido starts:
         // the game would otherwise read the other copy's files (an incomplete copy: a black screen)
