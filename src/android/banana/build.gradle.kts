@@ -86,7 +86,8 @@ fun sha256(file: File): String {
 }
 
 val bananaApk = providers.gradleProperty("bananaApk").orElse(providers.environmentVariable("BANANA_APK"))
-// Native libraries built from Banana Native's source (tools/android/build_bananative_native.sh): each one
+// Native libraries built from Banana Native's source (tools/android/build_bananative_hosts.sh, which CI runs with
+// native_patches/, or build_bananative_native.sh): each one
 // replaces the release's library of the same name, the rest stay the release's.
 val nativeLibs = providers.gradleProperty("bananaNativeLibs")
     .orElse(providers.environmentVariable("BANANA_NATIVE_LIBS"))
