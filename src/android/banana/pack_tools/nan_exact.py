@@ -106,18 +106,29 @@ PINK_EPS = 0.02
 def _hk_f32(v): return struct.unpack('<I', struct.pack('<f', v))[0]
 
 
+def _hk_composite(m, ty, ids):   # a constant composite of these constants (an existing one, else a new declaration)
+    for x in m.ins:
+        if x[0] & 0xffff == OP_CONSTANT_COMPOSITE and x[1] == ty and x[3:] == list(ids): return x[2]
+    c = m.new_id()
+    m._insert_decl([(3 + len(ids)) << 16 | OP_CONSTANT_COMPOSITE, ty, c, *ids])
+    return c
+
+
 def mip_error_split(m):
-    """In a pixel shader, a float4 implicit-lod sample with any trace of ASTC's error colour (green under red and under blue) is read again level by level, and a
-    level that reads as the error colour is left out: the coarser one when the finer one has content, else the finer one, else the base level, else 0. A
-    trilinear sample between a level the game filled and one it never did came out pink. Samples with no such trace run as before (the extra reads are in a
-    branch); a sample in a loop header block is left as it is. → samples rewritten"""
+    """In a pixel shader, a float4 implicit-lod sample with any trace of ASTC's error colour (green under red and under blue) is read again in a branch, the
+    texels that read as the error colour left out. A 2D (array) texture's four texels of the finer level are fetched and weighted as bilinear filtering does,
+    without those: an edge between storage the game filled and storage it never did came out pink. When all four are, the coarser level, else the base level,
+    else 0; when none is, the sample as it was (the finer level alone when the coarser one has a trace). Other textures: their two levels apart, one that reads
+    as the error colour left out. Samples with no trace run as before; a sample in a loop header block is left as it is. → samples rewritten"""
     if m.model != 'ps': return 0
     f32 = m.find_type(OP_TYPE_FLOAT, 32)
     v4 = m.find_type(OP_TYPE_VECTOR, f32, 4) if f32 is not None else None
     if v4 is None: return 0
-    deftype = {x[2]: x[1] for x in m.ins if x[0] & 0xffff in (OP_LOAD, HK_OP_SAMPLED_IMAGE, HK_OP_PHI, OP_COPY_OBJECT, OP_SELECT) and len(x) > 2}
 
-    def plan(x):   # (coordinate components of a level, arrayed, explicit operand mask, offset operand ids) of a sample this rewrites, else None
+    def deftypes(): return {x[2]: x[1] for x in m.ins if x[0] & 0xffff in (OP_LOAD, HK_OP_SAMPLED_IMAGE, HK_OP_PHI, OP_COPY_OBJECT, OP_SELECT) and len(x) > 2}
+    deftype = deftypes()
+
+    def plan(x):   # (image type, dim, arrayed, explicit operand mask, offset operand ids, the integer offset id or None, texel path) of a sample this rewrites
         if x[0] & 0xffff != 87 or x[1] != v4: return None
         st = m.types.get(deftype.get(x[3]))
         if not st or st[0] & 0xffff != OP_TYPE_SAMPLED_IMAGE: return None
@@ -125,12 +136,13 @@ def mip_error_split(m):
         if not im or im[0] & 0xffff != OP_TYPE_IMAGE or im[3] not in (0, 1, 2, 3) or im[4] == 1 or im[6] or im[2] != f32: return None
         mask, ops, k = (x[5], x[6:], 0) if len(x) > 5 else (0, [], 0)
         if mask & ~0xb9: return None   # Bias, ConstOffset, Offset, ConstOffsets, MinLod only
-        offs = []
+        offs, ioff = [], None
         for bit, n in HK_IMAGE_OPERANDS:
             if mask & bit:
                 if bit in (0x8, 0x10, 0x20): offs += ops[k:k + n]
+                if bit in (0x8, 0x10): ioff = ops[k]
                 k += n
-        return ({0: 1, 1: 2, 2: 3, 3: 3}[im[3]], im[5], 0x2 | (mask & 0x38), offs)
+        return (st[2], im[3], im[5], 0x2 | (mask & 0x38), offs, ioff, im[3] == 1 and not mask & 0x20)
 
     if not any(plan(x) for x in m.ins): return 0
     if 50 not in m.caps:   # ImageQuery (the translator declares it in every module)
@@ -140,15 +152,40 @@ def mip_error_split(m):
     b1 = m.add_type(OP_TYPE_BOOL)
     b4 = m.add_type(OP_TYPE_VECTOR, b1, 4)
     v2 = m.add_type(OP_TYPE_VECTOR, f32, 2)
-    vecn = {1: f32, 2: v2, 3: m.add_type(OP_TYPE_VECTOR, f32, 3)}
+    v3 = m.add_type(OP_TYPE_VECTOR, f32, 3)
+    i32 = m.add_type(OP_TYPE_INT, 32, 1)
+    iv2, iv3 = m.add_type(OP_TYPE_VECTOR, i32, 2), m.add_type(OP_TYPE_VECTOR, i32, 3)
     c0, c1, ceps = m.add_const(f32, 0), m.add_const(f32, _hk_f32(1.0)), m.add_const(f32, _hk_f32(PINK_EPS))
+    i0, i1 = m.add_const(i32, 0), m.add_const(i32, 1)
+    half2 = _hk_composite(m, v2, [m.add_const(f32, _hk_f32(0.5))] * 2)
+    corner = {d: _hk_composite(m, iv2, [i1 if d[0] else i0, i1 if d[1] else i0]) for d in ((0, 0), (1, 0), (0, 1), (1, 1))}
     mag, zero = vec4_const(m, f32, ASTC_ERROR), vec4_const(m, f32, (0.0, 0.0, 0.0, 0.0))
-    deftype = {x[2]: x[1] for x in m.ins if x[0] & 0xffff in (OP_LOAD, HK_OP_SAMPLED_IMAGE, HK_OP_PHI, OP_COPY_OBJECT, OP_SELECT) and len(x) > 2}
+    deftype = deftypes()
+    valtype = {x[2]: x[1] for x in m.ins if len(x) > 2 and ((x[0] & 0xffff) in (12, 43, 44, 61, 79, 80, 81, 82, 83, 169, 245) or 109 <= (x[0] & 0xffff) <= 201)}
     loop_blocks, lab = set(), None
     for x in m.ins:
         if x[0] & 0xffff == HK_OP_LABEL: lab = x[1]
         elif x[0] & 0xffff == HK_OP_LOOP_MERGE: loop_blocks.add(lab)
     out, tail, n, cur, orig, own = [], {}, 0, None, None, set()
+
+    def e(op, ty, *words):   # emit an instruction with a result; → its id
+        r = m.new_id()
+        out.append([(3 + len(words)) << 16 | op, ty, r, *words])
+        return r
+
+    def glsl_op(ty, inst, *args): return e(OP_EXT_INST, ty, glsl, inst, *args)
+
+    def trace(v):   # any trace of the error colour: green under red and under blue
+        r, g, b = (e(HK_OP_CEXTRACT, f32, v, i) for i in range(3))
+        ge = e(HK_OP_FADD, f32, g, ceps)
+        return e(HK_OP_LAND, b1, e(HK_OP_FLESS, b1, ge, r), e(HK_OP_FLESS, b1, ge, b))
+
+    def is_error(v): return e(HK_OP_ALL, b1, e(OP_FORD_EQUAL, b4, v, mag))
+
+    def wide(b): return e(HK_OP_COMPOSITE_CONSTRUCT, b4, b, b, b, b)
+
+    def pick(b, yes, no): return e(OP_SELECT, v4, wide(b), yes, no)
+
     for x in m.ins:
         op = x[0] & 0xffff
         if op == HK_OP_LABEL: cur = orig = x[1]
@@ -157,38 +194,65 @@ def mip_error_split(m):
             out.append(x)
             if op in HK_TERMINATORS: cur = None
             continue
-        comps, arrayed, emask, offs = p
-        ids = iter(lambda: m.new_id(), None)
-        s0, r, g, b, lt1, lt2, cond, fix, merge = (next(ids) for _ in range(9))
-        out += [[x[0], v4, s0, *x[3:]],
-                [5 << 16 | HK_OP_CEXTRACT, f32, r, s0, 0], [5 << 16 | HK_OP_CEXTRACT, f32, g, s0, 1], [5 << 16 | HK_OP_CEXTRACT, f32, b, s0, 2]]
-        ge = next(ids)
-        out += [[5 << 16 | HK_OP_FADD, f32, ge, g, ceps], [5 << 16 | HK_OP_FLESS, b1, lt1, ge, r], [5 << 16 | HK_OP_FLESS, b1, lt2, ge, b],
-                [5 << 16 | HK_OP_LAND, b1, cond, lt1, lt2], [3 << 16 | HK_OP_SEL_MERGE, merge, 0], [4 << 16 | HK_OP_BRANCH_COND, cond, fix, merge],
-                [2 << 16 | HK_OP_LABEL, fix]]
-        coord = x[4]
-        if arrayed:
-            cq = next(ids)
-            out.append([5 << 16 | HK_OP_CEXTRACT, f32, cq, coord, 0] if comps == 1 else [(5 + comps) << 16 | HK_OP_VSHUF, vecn[comps], cq, coord, coord, *range(comps)])
-            coord_q = cq
+        imty, dim, arrayed, emask, offs, ioff, texels = p
+        simg, coord = x[3], x[4]
+        s0 = e(x[0] & 0xffff, v4, *x[3:])
+        cond = trace(s0)
+        fix, merge = m.new_id(), m.new_id()
+        out += [[3 << 16 | HK_OP_SEL_MERGE, merge, 0], [4 << 16 | HK_OP_BRANCH_COND, cond, fix, merge], [2 << 16 | HK_OP_LABEL, fix]]
+        comps = {0: 1, 1: 2, 2: 3, 3: 3}[dim]
+        ct = m.types.get(valtype.get(coord))
+        ncomp = ct[3] if ct and ct[0] & 0xffff == OP_TYPE_VECTOR else 1
+
+        def first(k):   # the coordinate's first k components
+            if ncomp == k: return coord
+            return e(HK_OP_CEXTRACT, f32, coord, 0) if k == 1 else e(HK_OP_VSHUF, {2: v2, 3: v3}[k], coord, coord, *range(k))
+        coord_q = first(comps)
+        lvl = e(HK_OP_CEXTRACT, f32, e(HK_OP_QUERY_LOD, v2, simg, coord_q), 0)
+        lo = glsl_op(f32, GLSL_FLOOR, lvl)
+        hi = e(HK_OP_FADD, f32, lo, c1)
+
+        def level(lod): return e(88, v4, simg, coord, emask, lod, *offs)
+        s_lo, s_hi, s_base = level(lo), level(hi), level(c0)
+        hi_bad, base_bad = is_error(s_hi), is_error(s_base)
+        coarser = pick(hi_bad, pick(base_bad, zero, s_base), s_hi)
+        if texels:
+            img = e(100, imty, simg)
+            lo_i = e(110, i32, lo)
+            size = e(103, iv3 if arrayed else iv2, img, lo_i)
+            size2 = e(HK_OP_VSHUF, iv2, size, size, 0, 1) if arrayed else size
+            uv = first(2)
+            t = e(131, v2, e(133, v2, uv, e(111, v2, size2)), half2)
+            fl = glsl_op(v2, GLSL_FLOOR, t)
+            fr = e(131, v2, t, fl)
+            ib = e(110, iv2, fl)
+            if ioff is not None: ib = e(128, iv2, ib, ioff)
+            top = e(130, iv2, size2, corner[(1, 1)])
+            if arrayed:
+                layers = e(HK_OP_CEXTRACT, i32, size, 2)
+                layer = glsl_op(i32, 45, e(110, i32, glsl_op(f32, 2, e(HK_OP_CEXTRACT, f32, coord, 2))), i0, e(130, i32, layers, i1))
+            fx, fy = e(HK_OP_CEXTRACT, f32, fr, 0), e(HK_OP_CEXTRACT, f32, fr, 1)
+            gx, gy = e(131, f32, c1, fx), e(131, f32, c1, fy)
+            weights = {(0, 0): e(133, f32, gx, gy), (1, 0): e(133, f32, fx, gy), (0, 1): e(133, f32, gx, fy), (1, 1): e(133, f32, fx, fy)}
+            acc = wsum = any_bad = all_bad = None
+            for d, w in weights.items():
+                c = glsl_op(iv2, 45, ib if d == (0, 0) else e(128, iv2, ib, corner[d]), corner[(0, 0)], top)
+                if arrayed: c = e(HK_OP_COMPOSITE_CONSTRUCT, iv3, c, layer)
+                tx = e(95, v4, img, c, 0x2, lo_i)
+                bad = is_error(tx)
+                wk = e(OP_SELECT, f32, bad, c0, w)
+                part = e(142, v4, tx, wk)
+                acc = part if acc is None else e(129, v4, acc, part)
+                wsum = wk if wsum is None else e(129, f32, wsum, wk)
+                any_bad = bad if any_bad is None else e(166, b1, any_bad, bad)
+                all_bad = bad if all_bad is None else e(HK_OP_LAND, b1, all_bad, bad)
+            kept = e(142, v4, acc, e(136, f32, c1, e(OP_SELECT, f32, all_bad, c1, wsum)))
+            keep = pick(trace(s_hi), s_lo, s0)
+            fixed = pick(any_bad, pick(all_bad, coarser, kept), keep)
         else:
-            coord_q = coord
-        q, lvl, lo, hi = next(ids), next(ids), next(ids), next(ids)
-        out += [[5 << 16 | HK_OP_QUERY_LOD, v2, q, x[3], coord_q], [5 << 16 | HK_OP_CEXTRACT, f32, lvl, q, 0],
-                [6 << 16 | OP_EXT_INST, f32, lo, glsl, GLSL_FLOOR, lvl], [5 << 16 | HK_OP_FADD, f32, hi, lo, c1]]
-        reads = {}
-        for name, lod in (('lo', lo), ('hi', hi), ('base', c0)):
-            s, eq, al, bad = next(ids), next(ids), next(ids), next(ids)
-            out += [[(7 + len(offs)) << 16 | 88, v4, s, x[3], coord, emask, lod, *offs], [5 << 16 | OP_FORD_EQUAL, b4, eq, s, mag],
-                    [4 << 16 | HK_OP_ALL, b1, al, eq], [7 << 16 | HK_OP_COMPOSITE_CONSTRUCT, b4, bad, al, al, al, al]]
-            reads[name] = (s, bad)
-        alt, lof, hif, fixed = next(ids), next(ids), next(ids), next(ids)
-        out += [[6 << 16 | OP_SELECT, v4, alt, reads['base'][1], zero, reads['base'][0]],
-                [6 << 16 | OP_SELECT, v4, lof, reads['lo'][1], alt, reads['lo'][0]],
-                [6 << 16 | OP_SELECT, v4, hif, reads['lo'][1], reads['hi'][0], s0],
-                [6 << 16 | OP_SELECT, v4, fixed, reads['hi'][1], lof, hif],
-                [2 << 16 | HK_OP_BRANCH, merge], [2 << 16 | HK_OP_LABEL, merge],
-                [7 << 16 | HK_OP_PHI, v4, x[2], s0, cur, fixed, fix]]
+            lo_bad = is_error(s_lo)
+            fixed = pick(hi_bad, pick(lo_bad, pick(base_bad, zero, s_base), s_lo), pick(lo_bad, s_hi, s0))
+        out += [[2 << 16 | HK_OP_BRANCH, merge], [2 << 16 | HK_OP_LABEL, merge], [7 << 16 | HK_OP_PHI, v4, x[2], s0, cur, fixed, fix]]
         own.add(x[2])
         cur = merge
         tail[orig] = merge
