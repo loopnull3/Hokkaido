@@ -197,7 +197,7 @@ index 00000000..4c3bf49d
 +    return n ? (double)bad / (double)n : 0.0;
 +}
 diff --git a/dm/gfx/vk_android/vka_tex.c b/dm/gfx/vk_android/vka_tex.c
-index 4f5e1961..1929abc0 100644
+index 4f5e1961..0265cc1a 100644
 --- a/dm/gfx/vk_android/vka_tex.c
 +++ b/dm/gfx/vk_android/vka_tex.c
 @@ -401,6 +401,8 @@ uint64_t nvn_sparse_gen(void); uint64_t nvn_sparse_copy(const void *pool, void *
@@ -271,14 +271,14 @@ index 4f5e1961..1929abc0 100644
 +// Textures whose upload found blocks that are no ASTC data are watched (astc_watch, from vka_tex_prepare): their storage is read again (every 64th prepare) and uploaded again
 +// when it changed, logged with whether it holds ASTC data then; the textures over the same storage are logged when one joins (callers hold g_tmu)
 +enum { NWATCH = 64 };
-+static struct { uint64_t serial, hash; int gpu_logged; } g_watch[NWATCH]; static int g_nwatch;
++static struct { uint64_t serial, hash; int gpu_logged, viewed; } g_watch[NWATCH]; static int g_nwatch;   // viewed: its storage read by the GPU too (gview)
 +static uint64_t g_bad_total;
 +double hk_astc_bad_share(const uint8_t *data, size_t n, unsigned bw, unsigned bh);   // vka_astc_hdr.cpp
 +static int watched(uint64_t serial) { for (int i = 0; i < g_nwatch; i++) if (g_watch[i].serial == serial) return 1; return 0; }
 +static void watch_add(uint64_t serial) {
 +    for (int i = 0; i < g_nwatch; i++) if (g_watch[i].serial == serial) return;
 +    if (g_nwatch == NWATCH) return;
-+    g_watch[g_nwatch].serial = serial; g_watch[g_nwatch].hash = 0; g_watch[g_nwatch].gpu_logged = 0; g_nwatch++;
++    g_watch[g_nwatch].serial = serial; g_watch[g_nwatch].hash = 0; g_watch[g_nwatch].gpu_logged = 0; g_watch[g_nwatch].viewed = 0; g_nwatch++;
 +    smap_ent *e = map_get(serial); const vka_img *im = e ? e->im : NULL;
 +    if (!im || !im->mem) return;
 +    static int nd;   // what the storage holds: its first bytes, its pool, and how much of it reads as ASTC of other block sizes
@@ -337,7 +337,7 @@ index 4f5e1961..1929abc0 100644
              VkBufferImageCopy c = {s.off, bx * f->bw, by * f->bh, {im->aspect, lv, ly, 1}, {0, 0, 0}, {w, h, z}};
              vk.vkCmdCopyBufferToImage(cb, s.buf, im->img, VK_IMAGE_LAYOUT_GENERAL, 1, &c);
              bytes += piece;
-@@ -3215,6 +3297,28 @@ void vka_tex_prepare(VkCommandBuffer cb) {
+@@ -3215,6 +3297,33 @@ void vka_tex_prepare(VkCommandBuffer cb) {
      }
      g_nreg_writes = 0;
      if (any_rw) vka_barrier(cb);
@@ -350,6 +350,11 @@ index 4f5e1961..1929abc0 100644
 +            if (!im || !im->mem || im->vpool) { static int ng; if (ng++ < 16) VLOG("ASTC watch: texture serial %llu: gone or without storage", (unsigned long long)g_watch[i].serial); g_watch[i--] = g_watch[--g_nwatch]; continue; }
 +            if (im->gpu_owned) { if (!g_watch[i].gpu_logged++) VLOG("ASTC watch: texture serial %llu: its content is the GPU's (a copy or draw wrote it), not read from storage", (unsigned long long)im->serial); continue; }
 +            if (dm_guest_unmapped((uintptr_t)im->mem, im->L.size)) continue;
++            if (!g_watch[i].viewed) {   // its first 256 bytes as the GPU reads them, against the CPU's ("NaN scan: watch:" line)
++                g_watch[i].viewed = 1; VkBuffer vb; VkDeviceSize vo;
++                if (vka_addr((uint64_t)(uintptr_t)im->mem, 256, &vb, &vo, NULL)) gview(cb, im);
++                else { static int nv; if (nv++ < 16) VLOG("ASTC watch: texture serial %llu: its storage %p has no GPU address (not placed memory)", (unsigned long long)im->serial, (const void *)im->mem); }
++            }
 +            uint64_t h = mem_hash(im->mem, im->L.size);
 +            if (h == g_watch[i].hash) continue;
 +            int first = !g_watch[i].hash; g_watch[i].hash = h;
@@ -366,7 +371,7 @@ index 4f5e1961..1929abc0 100644
      // GPU writes whose submission is done: the images over them that did not get their bytes are uploaded again (see gw_t above)
      gml_poll();
      if (vka_nan_on()) watch_scan(cb);
-@@ -3250,6 +3354,8 @@ void vka_tex_prepare(VkCommandBuffer cb) {
+@@ -3250,6 +3359,8 @@ void vka_tex_prepare(VkCommandBuffer cb) {
              while (lo < hi) { int m = (lo + hi) / 2; if ((uint64_t)(uintptr_t)by[m]->mem < w->hi) lo = m + 1; else hi = m; }
              for (int j = lo - 1; j >= 0 && (uint64_t)(uintptr_t)by[j]->mem + maxsz > w->lo; j--) {
                  vka_img *im = by[j]; uint64_t a = (uint64_t)(uintptr_t)im->mem;
