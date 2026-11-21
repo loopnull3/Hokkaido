@@ -31,6 +31,7 @@ fi
 git -C "$src" fetch -q --depth 1 origin "$commit"
 git -C "$src" checkout -q --force FETCH_HEAD
 git -C "$src" clean -q -fdx
+cp -r "$root/src/android/banana/native_patches/astcenc" "$src/dm/third_party/astcenc"   # (the patches' HDR block conversion builds it)
 for p in "$root"/src/android/banana/native_patches/*.patch; do
     [ -e "$p" ] || continue
     git -C "$src" apply --whitespace=nowarn "$p"
