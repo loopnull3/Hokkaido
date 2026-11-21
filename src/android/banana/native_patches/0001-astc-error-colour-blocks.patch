@@ -1,5 +1,5 @@
 diff --git a/dm/gfx/vk_android/vka_tex.c b/dm/gfx/vk_android/vka_tex.c
-index 4f5e1961..081bcc0a 100644
+index 4f5e1961..02ebb991 100644
 --- a/dm/gfx/vk_android/vka_tex.c
 +++ b/dm/gfx/vk_android/vka_tex.c
 @@ -401,6 +401,7 @@ uint64_t nvn_sparse_gen(void); uint64_t nvn_sparse_copy(const void *pool, void *
@@ -26,7 +26,7 @@ index 4f5e1961..081bcc0a 100644
                  uint32_t py0 = y0 * f->bh, py1 = y1 * f->bh > h ? h : y1 * f->bh;
                  VkBufferImageCopy cp = {s.off, bx * f->bw, (y1 - y0) * f->bh, {im->aspect, lv, ly, 1}, {0, (int32_t)py0, 0}, {w, py1 - py0, 1}};
                  vk.vkCmdCopyBufferToImage(cb, s.buf, im->img, VK_IMAGE_LAYOUT_GENERAL, 1, &cp);
-@@ -1109,8 +1112,26 @@ static int upload_bands_tracked(vka_img *im, const tex_t *t, VkCommandBuffer cb,
+@@ -1109,8 +1112,34 @@ static int upload_bands_tracked(vka_img *im, const tex_t *t, VkCommandBuffer cb,
  // A zero texel block: zeros, except ASTC, whose all-zero block is a reserved mode (the error colour): a void-extent block of colour (0, 0, 0, 0) there
  static int is_astc(VkFormat v) { return v >= VK_FORMAT_ASTC_4x4_UNORM_BLOCK && v <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK; }
  static const uint8_t k_astc_zero[16] = {0xFC, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -43,19 +43,27 @@ index 4f5e1961..081bcc0a 100644
 +// Blocks a Switch never samples as the error colour but this driver does, in place: an all-zero block (storage the guest left unmapped or unwritten:
 +// a tail of levels, a hole in a pool) becomes the void-extent block of 0, and an HDR void-extent block (no ASTC HDR profile on RADV / Xclipse) the LDR
 +// one of its colour clamped to [0, 1]. Every upload of an ASTC texture from guest storage goes through it
++static _Atomic uint64_t g_astc_zero, g_astc_hdr;
 +static void astc_clean(VkFormat v, uint8_t *p, size_t n) {
 +    if (!is_astc(v)) return;
++    uint64_t nz = 0, nh = 0;
 +    for (size_t i = 0; i + 16 <= n; i += 16) {
 +        uint64_t a, b; memcpy(&a, p + i, 8); memcpy(&b, p + i + 8, 8);
-+        if (!(a | b)) { memcpy(p + i, k_astc_zero, 16); continue; }
++        if (!(a | b)) { memcpy(p + i, k_astc_zero, 16); nz++; continue; }
 +        if ((a & 0xDFF) != 0xDFC || !(a & 0x200)) continue;   // void-extent: bits 0-8 0x1FC, 10-11 set; bit 9 HDR
 +        uint64_t c = 0; for (int k = 0; k < 4; k++) c |= (uint64_t)half_unorm16((uint16_t)(b >> 16 * k)) << 16 * k;
-+        a &= ~(uint64_t)0x200; memcpy(p + i, &a, 8); memcpy(p + i + 8, &c, 8);
++        a &= ~(uint64_t)0x200; memcpy(p + i, &a, 8); memcpy(p + i + 8, &c, 8); nh++;
 +    }
++    static _Atomic int once; if (!atomic_exchange(&once, 1)) VLOG("ASTC uploads: all-zero blocks become zero texels, HDR void-extent blocks LDR ones (Hokkaido)");
++    if (!nz && !nh) return;
++    uint64_t z0 = atomic_fetch_add(&g_astc_zero, nz), h0 = atomic_fetch_add(&g_astc_hdr, nh), z1 = z0 + nz, h1 = h0 + nh;
++    if (63 - __builtin_clzll(z1 | 1) != 63 - __builtin_clzll(z0 | 1) || 63 - __builtin_clzll(h1 | 1) != 63 - __builtin_clzll(h0 | 1))   // a line per power of two crossed
++        VLOG("ASTC uploads: %llu all-zero blocks made zero texels, %llu HDR void-extent blocks made LDR so far (format %d, this upload %llu / %llu of %zu)",
++             (unsigned long long)z1, (unsigned long long)h1, (int)v, (unsigned long long)nz, (unsigned long long)nh, n / 16);
  }
  // Zero texels without staging: a buffer of zero blocks (first half) and of ASTC's zero blocks (second half), the source of every unmapped part of a sparse texture
  enum { ZHALF = 2 << 20 };
-@@ -1236,7 +1257,7 @@ static void upload_sparse_parts(vka_img *im, VkCommandBuffer cb, uint64_t gen, u
+@@ -1236,7 +1265,7 @@ static void upload_sparse_parts(vka_img *im, VkCommandBuffer cb, uint64_t gen, u
                      if (so + sl > off + len) sl = off + len - so;
                      if (sl > cap) { free(part); cap = sl; if (!(part = malloc(cap))) { VRED("sparse texture serial %llu: copy of %llu bytes not allocated", (unsigned long long)im->serial, (unsigned long long)sl); goto out; } }
                      mapped += sl - nvn_sparse_copy(im->vpool, part, mem + so, sl);
@@ -64,7 +72,7 @@ index 4f5e1961..081bcc0a 100644
                      // the deswizzler reads level lv of layer ly at its offset in the whole storage, and writes row y at y * pitch: part holds just this run's bytes
                      if (nvn_deswizzle_rows(d, lv, ly, (const uint8_t *)((uintptr_t)part - (uintptr_t)so), s.ptr - (size_t)y0 * pitch, pitch, y0, y1)) {
                          VRED_ONCE("texture serial %llu format %#x target %d: no CPU deswizzle", (unsigned long long)im->serial, d->format, d->target); goto out; }
-@@ -2169,6 +2190,7 @@ cut:;
+@@ -2169,6 +2198,7 @@ cut:;
      for (uint32_t i = 0; i < k; i++) {
          piece_t *q = &pc[i];
          if (atomic_load(&q->bad)) break;
@@ -72,7 +80,7 @@ index 4f5e1961..081bcc0a 100644
          VkBufferImageCopy c = {q->s.off, q->bx * f->bw, q->by * f->bh, {im->aspect, q->lv, q->ly, 1}, {0, 0, 0}, {q->w, q->h, q->z}};
          vk.vkCmdCopyBufferToImage(cb, q->s.buf, im->img, VK_IMAGE_LAYOUT_GENERAL, 1, &c);
          bytes += q->pitch * q->by * q->z;
-@@ -2210,6 +2232,7 @@ static void upload_(vka_img *im, const tex_t *t, VkCommandBuffer cb, uint64_t *n
+@@ -2210,6 +2240,7 @@ static void upload_(vka_img *im, const tex_t *t, VkCommandBuffer cb, uint64_t *n
                  }
                  static _Atomic int nz; if (zb && atomic_fetch_add(&nz, 1) < 64) VLOG("NaN scan: upload of serial %llu format %#x level %u layer %u: %llu of %llu blocks all zero (storage %p)", (unsigned long long)t->serial, d->format, lv, ly, (unsigned long long)zb, (unsigned long long)nb, (const void *)t->mem);
              }
