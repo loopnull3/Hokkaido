@@ -63,6 +63,38 @@ def nan_inf_preserve(m):
     return True
 
 
+HK_SAMPLE_OPS = {87, 88, 91, 92, 95}   # OpImageSample(Proj)(Implicit|Explicit)Lod, OpImageFetch
+HK_OP_ALL, HK_OP_COMPOSITE_CONSTRUCT = 155, 80
+ASTC_ERROR = (1.0, 0.0, 1.0, 1.0)
+
+
+def astc_error_to_zero(m):
+    """A float4 texel read as ASTC's error colour (1, 0, 1, 1) is 0 instead. Storage the game never filled reads as zero blocks, which the
+    Switch samples as 0 and RADV on Xclipse decodes as the error colour: Mario Kart World's terrain arrays and Ocarina of Time's distant
+    textures came out magenta. → reads rewritten"""
+    f32 = m.find_type(OP_TYPE_FLOAT, 32)
+    v4 = m.find_type(OP_TYPE_VECTOR, f32, 4) if f32 is not None else None
+    if v4 is None: return 0
+
+    def wanted(x): return x[0] & 0xffff in HK_SAMPLE_OPS and x[1] == v4
+    todo = sum(1 for x in m.ins if wanted(x))
+    if not todo: return 0
+    mag, zero = vec4_const(m, f32, ASTC_ERROR), vec4_const(m, f32, (0.0, 0.0, 0.0, 0.0))
+    b1 = m.add_type(OP_TYPE_BOOL)
+    b4 = m.add_type(OP_TYPE_VECTOR, b1, 4)
+    out = []
+    for x in m.ins:
+        if not wanted(x):
+            out.append(x)
+            continue
+        t, eq, al, c4 = m.new_id(), m.new_id(), m.new_id(), m.new_id()
+        out += [[x[0], v4, t, *x[3:]], [5 << 16 | OP_FORD_EQUAL, b4, eq, t, mag], [4 << 16 | HK_OP_ALL, b1, al, eq],
+                [7 << 16 | HK_OP_COMPOSITE_CONSTRUCT, b4, c4, al, al, al, al], [6 << 16 | OP_SELECT, v4, x[2], c4, zero, t]]
+    m.ins = out
+    m.index()
+    return todo
+
+
 _banana_precise_minmax = precise_minmax
 
 
@@ -71,5 +103,6 @@ def precise_minmax(m):
     done = m.entry and any(x[0] & 0xffff == OP_EXECUTION_MODE and x[1] == m.entry[2] and x[2] == MODE_SZ_INF_NAN_PRESERVE for x in m.ins)
     if not done:   # (a module this ran on already keeps its selects as they are)
         nan_exact_minmax(m)
+        astc_error_to_zero(m)
         nan_inf_preserve(m)
     return n

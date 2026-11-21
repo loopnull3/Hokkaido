@@ -51,6 +51,7 @@ public final class HokkaidoBridge {
         Readiness.minSdk = BuildConfig.NX_MIN_SDK;
         UpdateCheck.android12 = BuildConfig.NX_MIN_SDK < 33;
         DumpCheck.workOverride = (dump, titleId) -> workFolder(app, dump, titleId);
+        if (app.getPackageName().equals(android.app.Application.getProcessName())) new Thread(() -> dropOldShadersAll(app), "hokkaido-shaders").start();
     }
 
     /**
@@ -348,25 +349,33 @@ public final class HokkaidoBridge {
     }
 
     /** Raised when Hokkaido's changes to the shader tools (pack_tools) change what they build: a game's shaders are then built again once. */
-    private static final String SHADER_TOOLS_MARK = "hokkaido-shader-tools-1";
+    private static final String SHADER_TOOLS_MARK = "hokkaido-shader-tools-2";
 
     /**
-     * Shaders built before Hokkaido's NaN-exact min / max / clamp (pack_tools/nan_exact.py) carry the release tools' version stamp, so nothing
-     * builds them again by itself: the pack's libraries (shaders/v-*) and the shader layer's (shaders/layer/lib) are removed once. The layer keeps
-     * its requests and builds them again while the game plays (or Build all shaders now). Only for a game the layer covers, which plays without
-     * a library meanwhile.
+     * Shaders built before Hokkaido's changes to the shader tools (pack_tools/nan_exact.py: NaN-exact min / max / clamp, ASTC's error colour
+     * read as 0) carry the release tools' version stamp, so nothing builds them again by itself: the pack's libraries (shaders/v-*) and the
+     * shader layer's (shaders/layer/lib) are removed once, and the mark lists what went. The layer keeps its requests and builds them again
+     * while the game plays (or Build all shaders now). Only for a game the layer covers, which plays without a library meanwhile.
      */
-    private static void dropOldShaders(File packDir) {
+    private static synchronized void dropOldShaders(File packDir) {
         File sh = new File(packDir, "shaders"), mark = new File(sh, SHADER_TOOLS_MARK);
         if (mark.isFile()) return;
+        StringBuilder gone = new StringBuilder();
         File[] libs = sh.listFiles(f -> f.isDirectory() && f.getName().startsWith("v-"));
-        if (libs != null) for (File d : libs) Mods.deleteTree(d);
-        Mods.deleteTree(new File(sh, "layer/lib"));
+        if (libs != null) for (File d : libs) { Mods.deleteTree(d); gone.append(d.getName()).append(d.exists() ? " (not removed)\n" : "\n"); }
+        File layer = new File(sh, "layer/lib");
+        if (layer.exists()) { Mods.deleteTree(layer); gone.append("layer/lib").append(layer.exists() ? " (not removed)\n" : "\n"); }
         try {
-            if (sh.isDirectory() || sh.mkdirs()) mark.createNewFile();
+            if (sh.isDirectory() || sh.mkdirs()) java.nio.file.Files.write(mark.toPath(), gone.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (IOException e) {
             // no mark: dropped again at the next start
         }
+    }
+
+    /** dropOldShaders for every pack in app storage, once Hokkaido's main process starts (never in the packer's or a game's process) */
+    private static void dropOldShadersAll(Context c) {
+        File[] packs = AppStorage.packs(c).listFiles(f -> f.isDirectory() && f.getName().matches("[0-9A-Fa-f]{16}"));
+        if (packs != null) for (File p : packs) if (ShaderLibs.layerCovers(p.getName().toUpperCase(Locale.ROOT), Prefs.layerEnv(c, p.getName()))) dropOldShaders(p);
     }
 
     /** The starting settings' version (startingSettings): raised when they change, so a game takes the new ones once. */
