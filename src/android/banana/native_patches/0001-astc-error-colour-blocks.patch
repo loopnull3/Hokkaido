@@ -190,7 +190,7 @@ index 00000000..a9d5656c
 +    return bad;
 +}
 diff --git a/dm/gfx/vk_android/vka_tex.c b/dm/gfx/vk_android/vka_tex.c
-index 4f5e1961..6b920bce 100644
+index 4f5e1961..ca4fdc8b 100644
 --- a/dm/gfx/vk_android/vka_tex.c
 +++ b/dm/gfx/vk_android/vka_tex.c
 @@ -401,6 +401,8 @@ uint64_t nvn_sparse_gen(void); uint64_t nvn_sparse_copy(const void *pool, void *
@@ -218,7 +218,7 @@ index 4f5e1961..6b920bce 100644
                  uint32_t py0 = y0 * f->bh, py1 = y1 * f->bh > h ? h : y1 * f->bh;
                  VkBufferImageCopy cp = {s.off, bx * f->bw, (y1 - y0) * f->bh, {im->aspect, lv, ly, 1}, {0, (int32_t)py0, 0}, {w, py1 - py0, 1}};
                  vk.vkCmdCopyBufferToImage(cb, s.buf, im->img, VK_IMAGE_LAYOUT_GENERAL, 1, &cp);
-@@ -1109,8 +1113,50 @@ static int upload_bands_tracked(vka_img *im, const tex_t *t, VkCommandBuffer cb,
+@@ -1109,8 +1113,72 @@ static int upload_bands_tracked(vka_img *im, const tex_t *t, VkCommandBuffer cb,
  // A zero texel block: zeros, except ASTC, whose all-zero block is a reserved mode (the error colour): a void-extent block of colour (0, 0, 0, 0) there
  static int is_astc(VkFormat v) { return v >= VK_FORMAT_ASTC_4x4_UNORM_BLOCK && v <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK; }
  static const uint8_t k_astc_zero[16] = {0xFC, 0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -261,9 +261,31 @@ index 4f5e1961..6b920bce 100644
 +             (unsigned long long)z1, (unsigned long long)h1, (int)v, (unsigned long long)nz, (unsigned long long)nh, n / 16);
 +    return bad;
 +}
++// Textures whose upload found blocks that are no ASTC data are watched (astc_watch, from vka_tex_prepare): their storage is read again (every 64th prepare) and uploaded again
++// when it changed, logged with whether it holds ASTC data then; the textures over the same storage are logged when one joins (callers hold g_tmu)
++enum { NWATCH = 64 };
++static struct { uint64_t serial, hash; int gpu_logged; } g_watch[NWATCH]; static int g_nwatch;
++static uint64_t g_bad_total;
++static void watch_add(uint64_t serial) {
++    for (int i = 0; i < g_nwatch; i++) if (g_watch[i].serial == serial) return;
++    if (g_nwatch == NWATCH) return;
++    g_watch[g_nwatch].serial = serial; g_watch[g_nwatch].hash = 0; g_watch[g_nwatch].gpu_logged = 0; g_nwatch++;
++    smap_ent *e = map_get(serial); const vka_img *im = e ? e->im : NULL;
++    if (!im || !im->mem) return;
++    uint64_t a = (uint64_t)(uintptr_t)im->mem, b = a + im->L.size; static int nl;
++    for (int j = 0; j < g_nlive && nl < 48; j++) {
++        const vka_img *o = g_live[j]; uint64_t oa = (uint64_t)(uintptr_t)o->mem, ob = oa + o->L.size;
++        if (o == im || !o->mem || ob <= a || oa >= b) continue;
++        nl++; VLOG("ASTC watch: texture serial %llu (%ux%u format %#x) shares storage with serial %llu %ux%u layers %u format %#x flags %#x target %d at %+lld bytes (gpu-owned %d, from storage %d)",
++                   (unsigned long long)serial, im->d.width, im->d.height, im->d.format, (unsigned long long)o->serial, o->d.width, o->d.height, o->layers, o->d.format, o->d.flags,
++                   o->d.target, (long long)(oa - a), o->gpu_owned, o->from_mem);
++    }
++}
 +// Where uploads found blocks that are no ASTC data: the texture, level and layer, and its layout, for the first 64
 +static void astc_bad_note(const tex_t *t, uint32_t level, uint32_t layer, uint64_t bad, size_t n) {
-+    static _Atomic int k; if (!bad || atomic_fetch_add(&k, 1) >= 64) return;
++    if (!bad) return;
++    g_bad_total += bad; watch_add(t->serial);
++    static _Atomic int k; if (atomic_fetch_add(&k, 1) >= 64) return;
 +    const nvn_texdesc *d = &t->d;
 +    VLOG("ASTC upload: texture serial %llu %ux%ux%u target %d format %#x flags %#x levels %u, level %u layer %u: %llu of %zu blocks are no ASTC data, made zero texels (storage %p, level at +%#llx, layer size %#llx)",
 +         (unsigned long long)t->serial, d->width, d->height, d->depth, d->target, d->format, d->flags, d->levels, level, layer, (unsigned long long)bad, n,
@@ -271,7 +293,7 @@ index 4f5e1961..6b920bce 100644
  }
  // Zero texels without staging: a buffer of zero blocks (first half) and of ASTC's zero blocks (second half), the source of every unmapped part of a sparse texture
  enum { ZHALF = 2 << 20 };
-@@ -1236,7 +1282,7 @@ static void upload_sparse_parts(vka_img *im, VkCommandBuffer cb, uint64_t gen, u
+@@ -1236,7 +1304,7 @@ static void upload_sparse_parts(vka_img *im, VkCommandBuffer cb, uint64_t gen, u
                      if (so + sl > off + len) sl = off + len - so;
                      if (sl > cap) { free(part); cap = sl; if (!(part = malloc(cap))) { VRED("sparse texture serial %llu: copy of %llu bytes not allocated", (unsigned long long)im->serial, (unsigned long long)sl); goto out; } }
                      mapped += sl - nvn_sparse_copy(im->vpool, part, mem + so, sl);
@@ -280,7 +302,7 @@ index 4f5e1961..6b920bce 100644
                      // the deswizzler reads level lv of layer ly at its offset in the whole storage, and writes row y at y * pitch: part holds just this run's bytes
                      if (nvn_deswizzle_rows(d, lv, ly, (const uint8_t *)((uintptr_t)part - (uintptr_t)so), s.ptr - (size_t)y0 * pitch, pitch, y0, y1)) {
                          VRED_ONCE("texture serial %llu format %#x target %d: no CPU deswizzle", (unsigned long long)im->serial, d->format, d->target); goto out; }
-@@ -2169,6 +2215,7 @@ cut:;
+@@ -2169,6 +2237,7 @@ cut:;
      for (uint32_t i = 0; i < k; i++) {
          piece_t *q = &pc[i];
          if (atomic_load(&q->bad)) break;
@@ -288,7 +310,7 @@ index 4f5e1961..6b920bce 100644
          VkBufferImageCopy c = {q->s.off, q->bx * f->bw, q->by * f->bh, {im->aspect, q->lv, q->ly, 1}, {0, 0, 0}, {q->w, q->h, q->z}};
          vk.vkCmdCopyBufferToImage(cb, q->s.buf, im->img, VK_IMAGE_LAYOUT_GENERAL, 1, &c);
          bytes += q->pitch * q->by * q->z;
-@@ -2210,6 +2257,7 @@ static void upload_(vka_img *im, const tex_t *t, VkCommandBuffer cb, uint64_t *n
+@@ -2210,6 +2279,7 @@ static void upload_(vka_img *im, const tex_t *t, VkCommandBuffer cb, uint64_t *n
                  }
                  static _Atomic int nz; if (zb && atomic_fetch_add(&nz, 1) < 64) VLOG("NaN scan: upload of serial %llu format %#x level %u layer %u: %llu of %llu blocks all zero (storage %p)", (unsigned long long)t->serial, d->format, lv, ly, (unsigned long long)zb, (unsigned long long)nb, (const void *)t->mem);
              }
@@ -296,3 +318,32 @@ index 4f5e1961..6b920bce 100644
              VkBufferImageCopy c = {s.off, bx * f->bw, by * f->bh, {im->aspect, lv, ly, 1}, {0, 0, 0}, {w, h, z}};
              vk.vkCmdCopyBufferToImage(cb, s.buf, im->img, VK_IMAGE_LAYOUT_GENERAL, 1, &c);
              bytes += piece;
+@@ -3215,6 +3285,28 @@ void vka_tex_prepare(VkCommandBuffer cb) {
+     }
+     g_nreg_writes = 0;
+     if (any_rw) vka_barrier(cb);
++    // Watched textures (watch_add): storage read again every 64th prepare (about a quarter second), uploaded again when it changed
++    static uint64_t wtick;
++    if (g_nwatch && !(++wtick & 63)) {
++        int up = 0;
++        for (int i = 0; i < g_nwatch; i++) {
++            smap_ent *e = map_get(g_watch[i].serial); vka_img *im = e ? e->im : NULL;
++            if (!im || !im->mem || im->vpool) { static int ng; if (ng++ < 16) VLOG("ASTC watch: texture serial %llu: gone or without storage", (unsigned long long)g_watch[i].serial); g_watch[i--] = g_watch[--g_nwatch]; continue; }
++            if (im->gpu_owned) { if (!g_watch[i].gpu_logged++) VLOG("ASTC watch: texture serial %llu: its content is the GPU's (a copy or draw wrote it), not read from storage", (unsigned long long)im->serial); continue; }
++            if (dm_guest_unmapped((uintptr_t)im->mem, im->L.size)) continue;
++            uint64_t h = mem_hash(im->mem, im->L.size);
++            if (h == g_watch[i].hash) continue;
++            int first = !g_watch[i].hash; g_watch[i].hash = h;
++            uint64_t b0 = g_bad_total;
++            tex_t t = {0}; t.serial = im->serial; t.d = im->d; t.L = im->L; t.mem = (uint8_t *)im->mem;
++            upload_tracked(im, &t, cb); up = 1;
++            uint64_t nb = g_bad_total - b0; static int nw;
++            if (nw++ < 96) VLOG("ASTC watch: texture serial %llu %ux%u format %#x: storage %s, uploaded again: %s (frame %llu)", (unsigned long long)im->serial, im->d.width, im->d.height,
++                                im->d.format, first ? "read after its first upload" : "changed", nb ? "still not ASTC data" : "ASTC data now", (unsigned long long)vka_frame());
++            if (!nb) g_watch[i--] = g_watch[--g_nwatch];
++        }
++        if (up) vka_barrier(cb);
++    }
+     // GPU writes whose submission is done: the images over them that did not get their bytes are uploaded again (see gw_t above)
+     gml_poll();
+     if (vka_nan_on()) watch_scan(cb);
