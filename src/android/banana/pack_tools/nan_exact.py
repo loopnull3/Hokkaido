@@ -5,6 +5,8 @@
 # RADV on Xclipse (Galaxy S26) did not keep GLSL.std.450's NaN rules: the froxel fog compute shaders of Mario Kart World and Ocarina of
 # Time wrote NaN that the game's FMNMX / saturate guards remove on the Switch, and bloom spread it over the screen (white picture, white blocks)
 
+import sys
+
 OP_IS_NAN = 156
 GLSL_N_MIN, GLSL_N_MAX, GLSL_N_CLAMP = 79, 80, 81
 CAP_SZ_INF_NAN_PRESERVE, MODE_SZ_INF_NAN_PRESERVE = 4466, 4461
@@ -266,6 +268,26 @@ def mip_error_split(m):
     return n
 
 
+def _hk_validator():   # the build's SPIR-V validator (vk_android_build.py VALIDATE: data → None when valid, else the error), None outside a build
+    for mod in list(sys.modules.values()):
+        f = getattr(mod, 'VALIDATE', None)
+        if callable(f): return f
+    return None
+
+
+def _hk_pass(m, fn, check):   # fn applied to m; undone when it raises, or when check says the module it leaves is not valid (it was before)
+    saved = [list(x) for x in m.ins]
+    try:
+        if not fn(m) or check is None: return
+        err = check(m.data())
+        if err is None: return
+        print(f'[RED] Hokkaido {fn.__name__}: the module it left is not valid ({str(err)[:160]}): left out of this module', flush=True)
+    except Exception as e:
+        print(f'[RED] Hokkaido {fn.__name__}: {e!r}: left out of this module', flush=True)
+    m.ins = saved
+    m.index()
+
+
 _banana_precise_minmax = precise_minmax
 
 
@@ -273,8 +295,9 @@ def precise_minmax(m):
     n = _banana_precise_minmax(m)
     done = m.entry and any(x[0] & 0xffff == OP_EXECUTION_MODE and x[1] == m.entry[2] and x[2] == MODE_SZ_INF_NAN_PRESERVE for x in m.ins)
     if not done:   # (a module this ran on already keeps its selects as they are)
-        nan_exact_minmax(m)
-        astc_error_to_zero(m)
-        mip_error_split(m)
-        nan_inf_preserve(m)
+        # Each change is checked by the build's validator when the module is valid before it, and left out of a module it would break, so a shader
+        # never fails to build over them (Ocarina of Time's library stopped at 96 % with some shaders not built)
+        val = _hk_validator()
+        check = val if val is not None and val(m.data()) is None else None
+        for fn in (nan_exact_minmax, astc_error_to_zero, mip_error_split, nan_inf_preserve): _hk_pass(m, fn, check)
     return n
